@@ -6,6 +6,7 @@
     "declaration": true,
     "allowImportingTsExtensions": true,
     "emitDeclarationOnly": true,
+    "rootDir": "src",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,

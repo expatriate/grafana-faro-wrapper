@@ -39,7 +39,14 @@ console.log(`\n✓ All ${entries.length} declared entry points resolve to built 
 
 const declaredValues = [
   ...readFileSync(resolve(root, pkg.types), 'utf8').matchAll(/^export \{([^}]*)\};$/gm),
-].flatMap(([, names]) => names.split(',').map((name) => name.trim()));
+].flatMap(([, names]) =>
+  names.split(',').map((name) =>
+    name
+      .trim()
+      .split(/\s+as\s+/)
+      .pop(),
+  ),
+);
 const runtimeValues = Object.keys(await import(resolve(root, pkg.module)));
 const typedOnly = declaredValues.filter((name) => !runtimeValues.includes(name));
 if (typedOnly.length) {
@@ -55,8 +62,12 @@ try {
   console.error(`✗ ${pkg.unpkg} fails to load in a browser-like context: ${error.message}`);
   process.exit(1);
 }
-if (typeof browserGlobals.GrafanaFaroWrapper?.FaroService !== 'function') {
-  console.error(`✗ ${pkg.unpkg} does not expose GrafanaFaroWrapper.FaroService`);
+const umd = browserGlobals.GrafanaFaroWrapper;
+if (
+  typeof umd?.FaroService !== 'function' ||
+  typeof umd?.renderHelpers?.checkRender !== 'function'
+) {
+  console.error(`✗ ${pkg.unpkg} does not expose GrafanaFaroWrapper.FaroService and renderHelpers`);
   process.exit(1);
 }
 console.log(`✓ ${pkg.unpkg} loads in a browser-like context as GrafanaFaroWrapper.`);

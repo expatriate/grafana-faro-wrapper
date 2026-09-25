@@ -11,6 +11,8 @@
 - **`FaroService`** — инициализация Faro с OTLP HTTP-транспортом, санитизация биконов, пауза и повторный запуск.
 - **`MetricsService`** — пользовательские метрики с единицей, типом, метками и результатом.
 - **`MetricsCollector`** — SLO-метрика: ждёт, пока пройдут все шаги, с таймаутом и паузой.
+- **Проверки вёрстки** — готовые проверки для шагов: элементы отрисованы, их достаточно, картинки и фоны
+  загрузились.
 
 Работает с Faro 1.19+ и 2.x. Бандл собран под ES2019 и работает в Chrome 73+, Firefox 69+, Safari 12.1+.
 
@@ -244,6 +246,59 @@ pageReady.addStep(
   в цепочку.
 - `log: true` пишет ход сбора в консоль.
 
+## Проверки вёрстки
+
+Хелперы проверяют DOM и возвращают `boolean` или `Promise<boolean>`, не бросая исключений, поэтому подходят
+и как проверка шага, и как условие готовности:
+
+```typescript
+import {
+  asyncCheckBackgroundImagesIsDisplayed,
+  asyncCheckImagesIsDisplayed,
+  checkGTEAmount,
+  checkRender,
+  checkRenderInnerValue,
+} from 'grafana-faro-wrapper';
+
+paymentReady
+  .addStep('tariff', () => checkRenderInnerValue(['[data-slo="tariff-name"]']))
+  .addStep('methods', () => checkGTEAmount('[data-slo="payment-list"] li', 12))
+  .addStep(
+    'method-images',
+    () => asyncCheckImagesIsDisplayed('[data-slo="payment-list"] img'),
+    () => checkGTEAmount('[data-slo="payment-list"] img', 1),
+  )
+  .addStep('reseller-logos', () =>
+    asyncCheckBackgroundImagesIsDisplayed('[data-slo="reseller-link"]'),
+  )
+  .addStep('controls', () => checkRender(['[data-slo="code-input"]', '[data-slo="code-button"]']));
+```
+
+| Хелпер                                                        | Проходит, когда                                                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `checkRender(selectors)`                                      | каждый селектор есть в DOM                                                          |
+| `checkRenderInnerValue(selectors)`                            | каждый элемент есть и не пустой                                                     |
+| `checkEnabledButtonState(selector)`                           | кнопка есть, без `disabled` и без класса `disabled`                                 |
+| `getAmount(selector)`                                         | возвращает число элементов                                                          |
+| `checkAmount(selector, n)`, `checkGTEAmount(selector, n)`     | элементов ровно `n` / не меньше `n`                                                 |
+| `checkImagesIsDisplayed(selector)`                            | синхронно: все картинки уже загружены                                               |
+| `asyncCheckImagesIsDisplayed(selector, timeoutMs?)`           | все картинки декодированы (`img.decode()`) за `timeoutMs`                           |
+| `asyncCheckBackgroundImagesIsDisplayed(selector, timeoutMs?)` | у каждого элемента загрузилась своя картинка: `<img>` внутри или `background-image` |
+| `extractBackgroundUrl(element)`                               | возвращает URL из `background-image` или `null`                                     |
+| `loadImage(src, timeoutMs?)`                                  | картинка по адресу загрузилась за `timeoutMs`                                       |
+
+- `timeoutMs` по умолчанию — `DEFAULT_IMAGE_TIMEOUT_MS` (10 секунд). Картинка, которая не загрузилась за это
+  время, не прошла проверку.
+- Если элементов по селектору нет, проверки количества и отрисовки возвращают `false`, поэтому для картинок,
+  которые появляются позже, добавляйте условие готовности, как в примере.
+- Растровая картинка с нулевой шириной считается сломанной, SVG без собственных размеров — загруженным.
+- «IsDisplayed» значит «загружено», а не «видно на экране»: элемент с `display: none` тоже пройдёт проверку.
+- Из `background-image` берётся первый `url()`: у `image-set(...)` это первый вариант, а не тот, что выбрал
+  браузер. Фон только из градиента и фоны псевдоэлементов `::before`/`::after` не проверяются.
+
+Те же функции доступны объектом `renderHelpers` — так они назывались в прежней сборке:
+`const { checkRender } = GrafanaFaroWrapper.renderHelpers`.
+
 ## Остановка и повторный запуск
 
 Faro регистрируется один раз на страницу. Поэтому `destroy()` ставит его на паузу и сбрасывает
@@ -289,6 +344,8 @@ Faro регистрируется один раз на страницу. Поэ�
 `FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetric`, `MetricUnit`, `MetricType`, `MetricLabels`,
 `MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricsCollectorStatus`,
 `StepCheck`, `StepReadinessCheck`.
+
+Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
 
 ## Миграция с 0.3
 

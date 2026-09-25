@@ -11,3 +11,5 @@ export type {
 export type * from './metrics-collector/types.ts';
 export { MetricsService } from './metrics-service/MetricsService.ts';
 export type * from './metrics-service/types.ts';
+export * from './render-helpers/index.ts';
+export * as renderHelpers from './render-helpers/index.ts';

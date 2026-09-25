@@ -10,21 +10,11 @@ permissions:
 
 jobs:
   test:
-    name: Faro ${{ matrix.faro }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        faro: ['1.19.0', '2']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: npm install --ignore-scripts
-      - run: >-
-          npm install --no-save --ignore-scripts
-          @grafana/faro-core@${{ matrix.faro }}
-          @grafana/faro-web-sdk@${{ matrix.faro }}
-          @grafana/faro-transport-otlp-http@${{ matrix.faro }}
       - run: npm run check

@@ -61,6 +61,8 @@
     "@grafana/faro-core": "^2.12.1",
     "@grafana/faro-transport-otlp-http": "^2.12.1",
     "@grafana/faro-web-sdk": "^2.12.1",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",

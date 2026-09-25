@@ -27,25 +27,33 @@ npm install grafana-faro-wrapper @grafana/faro-web-sdk @grafana/faro-transport-o
 
 ### Без сборщика
 
-Пакет подключается к любой HTML-странице. UMD-бандл берёт Faro из глобалов его IIFE-бандлов, поэтому они
-идут раньше:
+Пакет подключается к любой HTML-странице. Есть два UMD-бандла, оба выставляют глобал `GrafanaFaroWrapper`:
 
-```html
-<script src="https://unpkg.com/@grafana/faro-web-sdk@2/dist/bundle/faro-web-sdk.iife.js"></script>
-<script src="https://unpkg.com/@grafana/faro-transport-otlp-http@2/dist/bundle/faro-transport-otlp-http.iife.js"></script>
-<script src="https://unpkg.com/grafana-faro-wrapper"></script>
-<script>
-  const faro = new GrafanaFaroWrapper.FaroService();
-  faro.init({
-    faroUrl: 'https://otlp.example.com/v1/logs',
-    faroKey: 'your-key',
-    app: { name: 'my-site' },
-    instrumentations: GrafanaFaroWebSdk.getWebInstrumentations(),
-  });
-</script>
-```
+- `dist/index.umd.full.js` — с Faro внутри, один файл на страницу:
 
-Всё, что пакет экспортирует, доступно в глобале `GrafanaFaroWrapper`.
+  ```html
+  <script src="https://unpkg.com/grafana-faro-wrapper/dist/index.umd.full.js"></script>
+  <script>
+    const faro = new GrafanaFaroWrapper.FaroService();
+    faro.init({
+      faroUrl: 'https://otlp.example.com/v1/logs',
+      faroKey: 'your-key',
+      app: { name: 'my-site' },
+    });
+  </script>
+  ```
+
+- `dist/index.umd.js` (его отдают `unpkg`/`jsdelivr` по умолчанию) — берёт Faro из глобалов его IIFE-бандлов,
+  поэтому они идут раньше:
+
+  ```html
+  <script src="https://unpkg.com/@grafana/faro-web-sdk@2/dist/bundle/faro-web-sdk.iife.js"></script>
+  <script src="https://unpkg.com/@grafana/faro-transport-otlp-http@2/dist/bundle/faro-transport-otlp-http.iife.js"></script>
+  <script src="https://unpkg.com/grafana-faro-wrapper"></script>
+  ```
+
+Стандартные инструментации Faro (`getWebInstrumentations`) в полном бандле не экспортируются: он собирает
+только то, что передано в `init` явно.
 
 ## Быстрый старт
 

@@ -2,31 +2,49 @@ import {
   BrowserConfig,
   Faro,
   initializeFaro,
-  MeasurementEvent,
   ReactIntegration,
   TransportItem,
 } from '@grafana/faro-react';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
+import { parseMetricLabels } from '../metrics-service/helpers/parseMetricLabels.ts';
 import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
-import {
-  sanitizeContextLabelsValues,
-  sanitizeEventUrlParams,
-  sanitizePageUrlParams,
-} from '../utils/satinizers.ts';
+import { sanitizeEventUrlParams, sanitizePageUrlParams } from '../utils/sanitizers.ts';
 
-interface FaroConfig {
+export interface FaroConfig {
   faroUrl: string;
   faroKey: string;
 }
 
-type Sanitizer = (beacon: Record<string, any>) => Record<string, any>;
+export type Sanitizer = (beacon: Record<string, any>) => Record<string, any>;
+
+type OtlpTransform = NonNullable<
+  ConstructorParameters<typeof OtlpHttpTransport>[0]['otlpTransform']
+>;
 
 const DEFAULT_SANITIZERS: Sanitizer[] = [
   sanitizePageUrlParams,
   sanitizeEventUrlParams,
-  sanitizeContextLabelsValues,
+  parseMetricLabels,
 ];
+
+const OTLP_LOG_BODIES: OtlpTransform = {
+  createMeasurementLogBody({ payload }) {
+    const [[name, value] = [], ...extraValues] = Object.entries(payload.values);
+
+    return toLogfmt({
+      faro_signal: 'measurement',
+      type: payload.type,
+      name,
+      value,
+      ...Object.fromEntries(extraValues.map(([key, extra]) => [`value_${key}`, extra])),
+      result: payload.context?.[MEASUREMENT_KEYS.RESULT],
+    });
+  },
+  createErrorLogBody({ payload }) {
+    return toLogfmt({ faro_signal: 'error', type: payload.type, message: payload.value });
+  },
+};
 
 export class FaroService {
   private instance: Faro | null = null;
@@ -58,7 +76,7 @@ export class FaroService {
         new OtlpHttpTransport({
           apiKey: faroKey,
           logsURL: faroUrl,
-          otlpTransform: this.createOtlpTransforms(),
+          otlpTransform: OTLP_LOG_BODIES,
         }),
         ...transports,
       ],
@@ -66,15 +84,11 @@ export class FaroService {
       instrumentations: [...(routerAdapter ? [routerAdapter] : []), ...instrumentations],
 
       beforeSend: (beacon) => {
-        if (!this.sanitizers?.length) return beforeSend?.(beacon) ?? beacon;
+        const sanitized = this.sanitizers.reduce((item, sanitize) => sanitize(item), {
+          ...beacon,
+        } as Record<string, any>) as TransportItem;
 
-        let beaconData: any = { ...beacon };
-
-        this.sanitizers?.forEach((el) => {
-          beaconData = { ...el(beaconData) };
-        });
-
-        return beforeSend?.(beaconData) ?? beaconData;
+        return beforeSend?.(sanitized) ?? sanitized;
       },
 
       ...rest,
@@ -103,29 +117,6 @@ export class FaroService {
       throw new Error('Faro not initialized. Call init() first.');
     }
     return this.instance;
-  }
-
-  private createOtlpTransforms(): {
-    createErrorLogBody?: ((item: TransportItem<unknown>) => string) | undefined;
-    createMeasurementLogBody?: (item: TransportItem<MeasurementEvent>) => string;
-  } {
-    return {
-      createMeasurementLogBody({ payload }) {
-        const [[name, value] = [], ...extraValues] = Object.entries(payload.values);
-
-        return toLogfmt({
-          faro_signal: 'measurement',
-          type: payload.type,
-          name,
-          value,
-          ...Object.fromEntries(extraValues.map(([key, extra]) => [`value_${key}`, extra])),
-          result: payload.context?.[MEASUREMENT_KEYS.RESULT],
-        });
-      },
-      createErrorLogBody({ payload }: any) {
-        return toLogfmt({ faro_signal: 'error', type: payload.type, message: payload.value });
-      },
-    };
   }
 
   destroy() {

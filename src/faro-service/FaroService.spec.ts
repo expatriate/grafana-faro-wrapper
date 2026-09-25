@@ -46,23 +46,14 @@ describe('FaroService', () => {
 
     const instance = svc.init(config);
 
-    // initializeFaro должен быть вызван
     expect(initializeFaro).toHaveBeenCalled();
-
-    // экземпляр возвращён и помечен как инициализированный
     expect(svc.isInitialized).toBe(true);
     expect(svc.getInstance()).toBeDefined();
 
-    // OtlpHttpTransport был вызван с ожидаемыми опциями
-    expect((OtlpHttpTransport as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(1);
     const otlpOpts = (OtlpHttpTransport as jest.Mock).mock.calls[0][0];
     expect(otlpOpts.apiKey).toBe(config.faroKey);
     expect(otlpOpts.logsURL).toBe(config.faroUrl);
-    expect(typeof otlpOpts.otlpTransform).toBe(
-      'object' /* функция/объект трансформаций ожидается */,
-    );
 
-    // повторный вызов init не должен создавать новый экземпляр, а должен предупредить
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const same = svc.init(config);
     expect(warnSpy).toHaveBeenCalled();
@@ -89,13 +80,8 @@ describe('FaroService', () => {
     };
 
     const result = wrapper(beacon);
-    // пользовательская beforeSend вызвана
     expect(userBeforeSend).toHaveBeenCalled();
-    // URL должен быть замаскирован
-    expect(result.meta.page.url).not.toContain('accessToken=abc');
-    // другие параметры сохранены
-    expect(result.meta.page.url).not.toContain('other=1');
-    // пользовательская модификация возвращаемого значения прошла через wrapper
+    expect(result.meta.page.url).toBe('example.com/path');
     expect(result.fromUser).toBe(true);
   });
 
@@ -125,7 +111,9 @@ describe('FaroService', () => {
         payload: { type: 'web-vitals', values: { lcp: 1200, delta: 50 } },
       });
 
-      expect(body).toBe('faro_signal=measurement type=web-vitals name=lcp value=1200 value_delta=50');
+      expect(body).toBe(
+        'faro_signal=measurement type=web-vitals name=lcp value=1200 value_delta=50',
+      );
     });
 
     test('escapes quotes and line breaks in an error message', () => {

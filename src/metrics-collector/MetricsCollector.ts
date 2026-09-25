@@ -2,7 +2,7 @@ import { MetricFn, ReadyToCheckConditionFn } from './types.ts';
 
 const DEFAULT_METRIC_STEP_CHECK_INTERVAL = 100;
 
-interface MetricsCollectorConfig<T extends string = string> {
+export interface MetricsCollectorConfig<T extends string = string> {
   failTime?: number;
   steps: T[];
   log?: boolean;
@@ -49,8 +49,6 @@ export class MetricsCollector<T extends string = string> {
 
   private isDone = false;
 
-  private isCleaning = false;
-
   private isPaused = false;
 
   constructor({ failTime, steps, onFail, onSuccess, log = false }: MetricsCollectorConfig<T>) {
@@ -67,45 +65,27 @@ export class MetricsCollector<T extends string = string> {
     }
 
     this.isRunning = true;
-    this.isDone = false;
     this.isPaused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = undefined;
 
-    if (this.log) {
-      console.info('[SLO-metrics:start]');
-    }
+    this.debug('start');
 
     this.startTime = performance.now();
     this.checkSteps();
-
-    if (!this.metricStepsCheckInterval) {
-      this.metricStepsCheckInterval = setInterval(() => {
-        this.checkSteps();
-      }, DEFAULT_METRIC_STEP_CHECK_INTERVAL);
-    }
-
-    if (this.failTime) {
-      this.metricTimeRunner = setTimeout(() => {
-        this.finish(false);
-      }, this.failTime);
-    }
+    this.scheduleTimers();
   }
 
   pause() {
-    if (this.startTime === undefined || !this.isRunning || this.isPaused || this.isDone) {
+    if (!this.isRunning || this.isPaused || this.isDone) {
       return;
     }
 
     this.isPaused = true;
     this.pauseStartTime = performance.now();
+    this.clearTimers();
 
-    this.cleanupTimeout();
-    this.cleanupCheckInterval();
-
-    if (this.log) {
-      console.info('[SLO-metrics:pause]');
-    }
+    this.debug('pause');
   }
 
   resume() {
@@ -120,52 +100,95 @@ export class MetricsCollector<T extends string = string> {
       this.pauseStartTime = undefined;
     }
 
-    if (this.log) {
-      console.info('[SLO-metrics:resume]');
-    }
+    this.debug('resume');
 
     this.checkMetricsResults();
     this.checkSteps();
-
-    if (!this.metricStepsCheckInterval) {
-      this.metricStepsCheckInterval = setInterval(
-        () => this.checkSteps(),
-        DEFAULT_METRIC_STEP_CHECK_INTERVAL,
-      );
-    }
-
-    if (this.failTime && this.startTime !== undefined) {
-      const elapsed = performance.now() - this.startTime - this.pausedDuration;
-      const remaining = this.failTime - elapsed;
-
-      if (remaining > 0) {
-        this.metricTimeRunner = setTimeout(() => this.finish(false), remaining);
-      } else {
-        this.finish(false);
-      }
-    }
+    this.scheduleTimers();
   }
 
   getStatus() {
-    const now = performance.now();
+    const runningTime = this.activeElapsed();
     return {
       isRunning: this.isRunning,
       isDone: this.isDone,
       isPaused: this.isPaused,
-      runningTime: this.startTime !== undefined ? now - this.startTime - this.pausedDuration : 0,
+      runningTime,
       pausedDuration: this.pausedDuration,
       registeredMetrics: Array.from(this.metrics.keys()),
       completedMetrics: Array.from(this.metricsResults.entries()),
       pendingMetrics: this.steps.filter((step) => !this.metricsResults.has(step)),
       remainingTime:
         this.failTime && this.startTime !== undefined
-          ? Math.max(0, this.failTime - (now - this.startTime - this.pausedDuration))
+          ? Math.max(0, this.failTime - runningTime)
           : undefined,
     };
   }
 
+  addMetricStep(key: T, fn: MetricFn, conditionFn?: ReadyToCheckConditionFn): this {
+    if (this.isDone || !this.steps.includes(key) || this.metrics.has(key)) {
+      return this;
+    }
+
+    this.start();
+    this.metrics.set(key, { fn, conditionFn });
+
+    this.debug('addMetricStep', key);
+
+    return this;
+  }
+
+  reset() {
+    this.clearTimers();
+
+    this.cycle++;
+    this.metrics.clear();
+    this.metricsResults.clear();
+    this.checksInProgress.clear();
+    this.isDone = false;
+    this.isRunning = false;
+    this.isPaused = false;
+    this.startTime = undefined;
+    this.pausedDuration = 0;
+    this.pauseStartTime = undefined;
+
+    this.debug('reset');
+  }
+
+  private activeElapsed() {
+    if (this.startTime === undefined) {
+      return 0;
+    }
+    return performance.now() - this.startTime - this.pausedDuration;
+  }
+
+  private scheduleTimers() {
+    this.metricStepsCheckInterval = setInterval(
+      () => this.checkSteps(),
+      DEFAULT_METRIC_STEP_CHECK_INTERVAL,
+    );
+
+    if (!this.failTime) {
+      return;
+    }
+
+    const remaining = this.failTime - this.activeElapsed();
+    if (remaining > 0) {
+      this.metricTimeRunner = setTimeout(() => this.finish(false), remaining);
+    } else {
+      this.finish(false);
+    }
+  }
+
+  private clearTimers() {
+    clearTimeout(this.metricTimeRunner);
+    clearInterval(this.metricStepsCheckInterval);
+    this.metricTimeRunner = undefined;
+    this.metricStepsCheckInterval = undefined;
+  }
+
   private async checkSteps() {
-    if (this.isCleaning || this.isPaused) {
+    if (this.isPaused) {
       return;
     }
 
@@ -191,28 +214,32 @@ export class MetricsCollector<T extends string = string> {
 
     await Promise.all(pendingChecks);
 
-    if (this.log) {
-      console.info('[SLO-metrics:checkSteps:results]', this.metricsResults);
-    }
+    this.debug('checkSteps:results', this.metricsResults);
     this.checkMetricsResults();
   }
 
   private async runCheck(key: T, fn: MetricFn): Promise<boolean> {
     try {
       const value = await fn();
-      if (this.log) {
-        console.info('[SLO-metrics:checkSteps:result]', key, value);
-      }
+      this.debug('checkSteps:result', key, value);
       return value;
     } catch {
-      if (this.log) {
-        console.info('[SLO-metrics:checkSteps:error]', key, false);
-      }
+      this.debug('checkSteps:error', key, false);
       return false;
     }
   }
 
-  private async finish(success: boolean) {
+  private checkMetricsResults() {
+    if (this.isDone || this.isPaused) {
+      return;
+    }
+
+    if (this.steps.every((step) => this.metricsResults.has(step))) {
+      this.finish(this.steps.every((step) => this.metricsResults.get(step) === true));
+    }
+  }
+
+  private finish(success: boolean) {
     if (this.isDone) {
       return;
     }
@@ -221,116 +248,34 @@ export class MetricsCollector<T extends string = string> {
 
     queueMicrotask(() => {
       this.isRunning = false;
+      this.clearTimers();
 
-      this.cleanupCheckInterval();
-      this.cleanupTimeout();
+      const result: MetricsCollectorCallback = {
+        timestamp: Date.now(),
+        duration: Math.round(this.activeElapsed()),
+        steps: Object.fromEntries(
+          this.steps.map((step) => [step, this.metricsResults.get(step) || false]),
+        ),
+      };
 
-      const timestamp = Date.now();
-      const duration = Math.round(
-        performance.now() - (this.startTime ?? performance.now()) - this.pausedDuration,
+      this.debug(
+        'finish',
+        success ? 'Success' : 'Fail',
+        new Date().toLocaleTimeString(),
+        result.duration,
       );
 
-      const stepResults = new Map<string, boolean>();
-
-      this.steps.forEach((el) => {
-        const stepRes = this.metricsResults.get(el) || false;
-        stepResults.set(el, stepRes);
-      });
       if (success) {
-        if (this.log) {
-          console.info(
-            '[SLO-metrics:finish]',
-            'Success',
-            new Date().toLocaleTimeString(),
-            duration,
-          );
-        }
-        this.onSuccess({
-          timestamp,
-          duration,
-          steps: Object.fromEntries(stepResults),
-        });
+        this.onSuccess(result);
       } else {
-        if (this.log) {
-          console.info('[SLO-metrics:finish]', 'Fail', new Date().toLocaleTimeString(), duration);
-        }
-        this.onFail({
-          timestamp,
-          duration,
-          steps: Object.fromEntries(stepResults),
-        });
+        this.onFail(result);
       }
     });
   }
 
-  private checkMetricsResults() {
-    if (this.isDone || this.isPaused) {
-      return;
-    }
-
-    const allStepsProcessed = this.steps.every((step) => this.metricsResults.has(step));
-    const allPassed = this.steps.every((step) => this.metricsResults.get(step) === true);
-
-    if (allStepsProcessed || allPassed) {
-      this.finish(allPassed);
-    }
-  }
-
-  addMetricStep(key: T, fn: MetricFn, conditionFn?: ReadyToCheckConditionFn): MetricsCollector {
-    if (this.isDone || !this.steps.includes(key) || this.metrics.has(key)) {
-      return this;
-    }
-
-    if (!this.isRunning && !this.isPaused) {
-      this.start();
-    }
-
-    this.metrics.set(key, { fn, conditionFn });
-
+  private debug(event: string, ...details: unknown[]) {
     if (this.log) {
-      console.info('[SLO-metrics:addMetricStep]', key);
-    }
-
-    return this;
-  }
-
-  private cleanupTimeout() {
-    if (this.metricTimeRunner) {
-      clearTimeout(this.metricTimeRunner);
-      this.metricTimeRunner = undefined;
-    }
-  }
-
-  private cleanupCheckInterval() {
-    this.isCleaning = true;
-    if (this.metricStepsCheckInterval) {
-      clearInterval(this.metricStepsCheckInterval);
-      this.metricStepsCheckInterval = undefined;
-    }
-    this.isCleaning = false;
-  }
-
-  reset() {
-    if (this.isCleaning) {
-      return;
-    }
-
-    this.cleanupTimeout();
-    this.cleanupCheckInterval();
-
-    this.cycle++;
-    this.metrics.clear();
-    this.metricsResults.clear();
-    this.checksInProgress.clear();
-    this.isDone = false;
-    this.isRunning = false;
-    this.isPaused = false;
-    this.startTime = undefined;
-    this.pausedDuration = 0;
-    this.pauseStartTime = undefined;
-
-    if (this.log) {
-      console.info('[SLO-metrics:reset]');
+      console.info(`[SLO-metrics:${event}]`, ...details);
     }
   }
 }

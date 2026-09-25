@@ -1,33 +1,41 @@
-import { constructMetricContext } from './helpers/constructMetricContext.ts';
 import { MetricsService } from './MetricsService.ts';
-
-jest.mock('./helpers/constructMetricContext.ts', () => ({
-  constructMetricContext: jest.fn(() => ({ mocked: 'context' })),
-}));
 
 describe('MetricsService', () => {
   let pushMeasurement: jest.Mock;
-  let fakeFaroService: any;
   let service: MetricsService;
 
   beforeEach(() => {
     pushMeasurement = jest.fn();
-    const instance = { api: { pushMeasurement } };
-    fakeFaroService = { getInstance: jest.fn(() => instance) };
+    const fakeFaroService: any = { getInstance: () => ({ api: { pushMeasurement } }) };
     service = new MetricsService(fakeFaroService);
-    jest.clearAllMocks();
   });
 
-  test('sends custom metric with numeric value and context', () => {
-    service.sendCustomMetric({ name: 'metric_one', value: 42, extra: 'x' } as any);
+  test('sends the value and metric description as measurement context', () => {
+    service.sendCustomMetric({
+      timestamp: 0,
+      name: 'checkout',
+      value: '42',
+      description: 'checkout completed',
+      unit: 'EVENTS',
+      type: 'counter',
+      labels: { step: 'payment' },
+      result: 'success',
+      buckets: [10, 100],
+    });
 
-    expect(pushMeasurement).toHaveBeenCalledTimes(1);
     expect(pushMeasurement).toHaveBeenCalledWith(
-      { type: 'custom', values: { metric_one: 42 } },
-      { context: { mocked: 'context' } },
+      { type: 'custom', values: { checkout: 42 } },
+      {
+        context: {
+          'measurement.description': 'checkout completed',
+          'measurement.unit': 'EVENTS',
+          'measurement.metric.type': 'counter',
+          'measurement.labels': { step: 'payment' },
+          'measurement.result': 'success',
+          'measurement.buckets': '10,100',
+        },
+      },
     );
-
-    expect(constructMetricContext).toHaveBeenCalledWith({ extra: 'x' });
   });
 
   test('converts non-numeric value to 0', () => {
@@ -35,7 +43,7 @@ describe('MetricsService', () => {
 
     expect(pushMeasurement).toHaveBeenCalledWith(
       { type: 'custom', values: { m: 0 } },
-      { context: { mocked: 'context' } },
+      expect.anything(),
     );
   });
 

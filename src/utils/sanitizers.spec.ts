@@ -1,6 +1,6 @@
-import { sanitizeEventUrlParams, sanitizePageUrlParams, sanitizeUrl } from './satinizers.ts';
+import { sanitizeEventUrlParams, sanitizePageUrlParams, sanitizeUrl } from './sanitizers.ts';
 
-describe('satinizers', () => {
+describe('sanitizers', () => {
   describe('sanitizeUrl', () => {
     test('replaces UUID in pathname with :id', () => {
       const input = 'https://example.com/users/550e8400-e29b-41d4-a716-446655440000/profile';
@@ -47,7 +47,6 @@ describe('satinizers', () => {
       };
       const out = sanitizePageUrlParams(beacon);
       expect(out.meta.page.url).toBe('example.com/users/:id');
-      // ensure other properties preserved
       expect(out.other).toBe(1);
     });
 

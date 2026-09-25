@@ -172,7 +172,7 @@ npm install
 npm run dev          # сборка в watch-режиме
 npm run typecheck
 npm test
-npm run build:all
+npm run build
 ```
 
 ## Релизы

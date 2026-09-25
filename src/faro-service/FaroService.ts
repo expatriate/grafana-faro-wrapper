@@ -137,14 +137,23 @@ export class FaroService {
 
   private sanitize(beacon: TransportItem): TransportItem | null {
     try {
-      return this.sanitizers.reduce((item, sanitize) => sanitize(item), {
-        ...beacon,
-        meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)),
-      } as Record<string, any>) as TransportItem;
+      return this.sanitizers.reduce(
+        (item, sanitize) => {
+          const sanitized = sanitize(item);
+          if (typeof sanitized !== 'object' || sanitized === null) {
+            throw new TypeError('sanitizer returned no beacon');
+          }
+          return sanitized;
+        },
+        {
+          ...beacon,
+          meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)),
+        } as Record<string, any>,
+      ) as TransportItem;
     } catch (error) {
       if (!this.sanitizerFailureReported) {
         this.sanitizerFailureReported = true;
-        console.warn(`${LOG_PREFIX} A sanitizer threw, beacons it fails on are dropped:`, error);
+        console.warn(`${LOG_PREFIX} A sanitizer failed, beacons it fails on are dropped:`, error);
       }
       return null;
     }

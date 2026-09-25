@@ -145,6 +145,19 @@ describe('FaroService', () => {
     warnSpy.mockRestore();
   });
 
+  test('warns when a sanitizer forgets to return the beacon', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    svc.addSanitizer(((beacon: any) => {
+      beacon.meta.user = undefined;
+    }) as any);
+
+    expect(faro.beforeSend({ type: 'log', meta: { user: { id: '1' } } })).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
   describe('OTLP log body', () => {
     function initTransforms() {
       new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);

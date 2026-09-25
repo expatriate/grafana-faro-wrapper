@@ -8,14 +8,17 @@ const NUMERIC_ID = /\b\d{6,}\b/g;
 const ID_PATTERNS = [UUID_WITH_OPTIONAL_SUFFIX, LONG_HEX_ID, NUMERIC_ID];
 const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
 
+export function sanitizePath(pathname: string): string {
+  return ID_PATTERNS.reduce(
+    (path, pattern) => path.replace(pattern, ':id'),
+    pathname.toLowerCase(),
+  );
+}
+
 export function sanitizeUrl(input: string): string {
   try {
     const url = new URL(input);
-    const pathname = ID_PATTERNS.reduce(
-      (path, pattern) => path.replace(pattern, ':id'),
-      url.pathname.toLowerCase(),
-    );
-    return url.host + pathname;
+    return url.host + sanitizePath(url.pathname);
   } catch {
     return input;
   }

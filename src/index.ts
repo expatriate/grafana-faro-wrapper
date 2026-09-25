@@ -5,3 +5,4 @@ export type * from './slo/types';
 export type { SloConfig, SloTracker } from './slo/trackSlo';
 export type * from './measurement/types';
 export * from './render-helpers/index';
+export { sanitizePath, sanitizeUrl } from './utils/sanitizers';

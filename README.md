@@ -264,6 +264,9 @@ faro.addSanitizer((beacon) => ({
 }));
 ```
 
+Те же правила доступны как функции: `sanitizeUrl(url)` возвращает хост и очищенный путь, `sanitizePath(pathname)` —
+очищенный путь для строки без хоста, например для `meta.view.name` из роутера.
+
 ## API
 
 | `FaroService`              | Описание                                                       |

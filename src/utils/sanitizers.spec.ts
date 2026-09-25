@@ -1,4 +1,4 @@
-import { sanitizeEventUrls, sanitizePageUrl, sanitizeUrl } from './sanitizers';
+import { sanitizeEventUrls, sanitizePageUrl, sanitizePath, sanitizeUrl } from './sanitizers';
 
 describe('sanitizers', () => {
   describe('sanitizeUrl', () => {
@@ -48,6 +48,14 @@ describe('sanitizers', () => {
     test('returns original input for invalid URL', () => {
       const input = 'not-a-valid-url';
       expect(sanitizeUrl(input)).toBe(input);
+    });
+  });
+
+  describe('sanitizePath', () => {
+    test('replaces ids in a bare pathname that is not a full URL', () => {
+      expect(sanitizePath('/Orders/0190a6e2-7c3b-7d4e-9f00-1a2b3c4d5e6f/items/1234567')).toBe(
+        '/orders/:id/items/:id',
+      );
     });
   });
 

@@ -108,7 +108,6 @@ import { MetricsService } from 'grafana-faro-wrapper';
 const metrics = new MetricsService(faro);
 
 metrics.sendCustomMetric({
-  timestamp: Date.now(),
   name: 'user_action',
   description: 'Клик по кнопке',
   value: 1,

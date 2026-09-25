@@ -7,6 +7,44 @@ import {
 import { MetricsService } from './MetricsService.ts';
 import { CustomMetricBase } from './types.ts';
 
+function sendThroughRealFaro(...metrics: CustomMetricBase[]): TransportItem[] {
+  const delivered: TransportItem[] = [];
+  class CollectingTransport extends BaseTransport {
+    readonly name = 'collecting';
+    readonly version = '0';
+    send(items: TransportItem | TransportItem[]) {
+      delivered.push(...[items].flat());
+    }
+  }
+  const faro = initializeFaro({
+    app: { name: 'test' },
+    batching: { enabled: false },
+    dedupe: true,
+    globalObjectKey: 'faroMetricsTest',
+    instrumentations: [],
+    internalLoggerLevel: InternalLoggerLevel.OFF,
+    isolate: true,
+    metas: [],
+    parseStacktrace: () => ({ frames: [] }),
+    paused: false,
+    preventGlobalExposure: true,
+    transports: [new CollectingTransport()],
+    unpatchedConsole: console,
+  });
+  const faroService: any = { getInstance: () => faro };
+
+  metrics.forEach((metric) => new MetricsService(faroService).sendCustomMetric(metric));
+  return delivered.filter((item) => item.type === 'measurement');
+}
+
+const click: CustomMetricBase = {
+  name: 'user_action',
+  value: 1,
+  description: 'button click',
+  unit: 'EVENTS',
+  type: 'counter',
+};
+
 describe('MetricsService', () => {
   let pushMeasurement: jest.Mock;
   let service: MetricsService;
@@ -19,7 +57,6 @@ describe('MetricsService', () => {
 
   test('sends the value and metric description as measurement context', () => {
     service.sendCustomMetric({
-      timestamp: 0,
       name: 'checkout',
       value: '42',
       description: 'checkout completed',
@@ -47,43 +84,17 @@ describe('MetricsService', () => {
   });
 
   test('delivers every identical metric instead of deduplicating repeats', () => {
-    const delivered: TransportItem[] = [];
-    class CollectingTransport extends BaseTransport {
-      readonly name = 'collecting';
-      readonly version = '0';
-      send(items: TransportItem | TransportItem[]) {
-        delivered.push(...[items].flat());
-      }
-    }
-    const faro = initializeFaro({
-      app: { name: 'test' },
-      batching: { enabled: false },
-      dedupe: true,
-      globalObjectKey: 'faroDedupeTest',
-      instrumentations: [],
-      internalLoggerLevel: InternalLoggerLevel.OFF,
-      isolate: true,
-      metas: [],
-      parseStacktrace: () => ({ frames: [] }),
-      paused: false,
-      preventGlobalExposure: true,
-      transports: [new CollectingTransport()],
-      unpatchedConsole: console,
-    });
-    const click: CustomMetricBase = {
-      timestamp: 0,
-      name: 'user_action',
-      value: 1,
-      description: 'button click',
-      unit: 'EVENTS',
-      type: 'counter',
-    };
-    const realFaroService: any = { getInstance: () => faro };
+    expect(sendThroughRealFaro(click, click)).toHaveLength(2);
+  });
 
-    new MetricsService(realFaroService).sendCustomMetric(click);
-    new MetricsService(realFaroService).sendCustomMetric(click);
+  test('stamps the measurement with the metric timestamp when one is given', () => {
+    const eventTime = Date.UTC(2026, 0, 1);
 
-    expect(delivered.filter((item) => item.type === 'measurement')).toHaveLength(2);
+    const [measurement] = sendThroughRealFaro({ ...click, timestamp: eventTime });
+
+    expect((measurement.payload as { timestamp: string }).timestamp).toBe(
+      '2026-01-01T00:00:00.000Z',
+    );
   });
 
   test('converts non-numeric value to 0', () => {

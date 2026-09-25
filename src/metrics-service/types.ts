@@ -1,5 +1,5 @@
 export type CustomMetricBase = {
-  timestamp: number;
+  timestamp?: number;
   name: string;
   value: string | number;
   description: string;

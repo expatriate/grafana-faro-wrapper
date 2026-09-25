@@ -6,7 +6,7 @@ import { CustomMetricBase } from './types.ts';
 export class MetricsService {
   constructor(private faroService: FaroService) {}
 
-  sendCustomMetric({ name, value, ...rest }: CustomMetricBase) {
+  sendCustomMetric({ name, value, timestamp, ...rest }: CustomMetricBase) {
     try {
       const faroInstance = this.faroService.getInstance();
 
@@ -15,7 +15,11 @@ export class MetricsService {
           type: 'custom',
           values: { [name]: safeNumberConversion(value) },
         },
-        { context: constructMetricContext(rest), skipDedupe: true },
+        {
+          context: constructMetricContext(rest),
+          skipDedupe: true,
+          timestampOverwriteMs: timestamp,
+        },
       );
     } catch (e) {
       console.warn(

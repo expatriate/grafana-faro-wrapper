@@ -1,4 +1,4 @@
-import { sanitizeResourceTimingUrl, sanitizePageUrl, sanitizeUrl } from './sanitizers.ts';
+import { sanitizeEventUrls, sanitizePageUrl, sanitizeUrl } from './sanitizers.ts';
 
 describe('sanitizers', () => {
   describe('sanitizeUrl', () => {
@@ -69,38 +69,61 @@ describe('sanitizers', () => {
     });
   });
 
-  describe('sanitizeResourceTimingUrl', () => {
-    test('sanitizes payload.attributes.name for faro.performance.resource events', () => {
+  describe('sanitizeEventUrls', () => {
+    test('sanitizes the resource URL of faro.performance.resource events', () => {
       const beacon: any = {
         type: 'event',
         payload: {
           name: 'faro.performance.resource',
-          attributes: { name: 'https://cdn.example.com/assets/1234567.png' },
+          attributes: { name: 'https://cdn.example.com/assets/1234567.png', duration: '12' },
         },
       };
-      const out = sanitizeResourceTimingUrl(beacon);
-      expect(out.payload.attributes.name).toBe('cdn.example.com/assets/:id.png');
+      const out = sanitizeEventUrls(beacon);
+      expect(out.payload.attributes).toEqual({
+        name: 'cdn.example.com/assets/:id.png',
+        duration: '12',
+      });
     });
 
-    test('does not change other events', () => {
+    test('strips query from page URLs reported by CSP violations', () => {
       const beacon: any = {
         type: 'event',
         payload: {
-          name: 'some.other.event',
-          attributes: { name: 'https://example.com/1234567' },
+          name: 'securitypolicyviolation',
+          attributes: {
+            documentURI: 'https://a.com/orders/1234567?token=secret',
+            referrer: 'https://a.com/login?email=john@example.com',
+            blockedURI: 'inline',
+          },
         },
       };
-      const out = sanitizeResourceTimingUrl(beacon);
-      expect(out.payload.attributes.name).toBe('https://example.com/1234567');
+      expect(sanitizeEventUrls(beacon).payload.attributes).toEqual({
+        documentURI: 'a.com/orders/:id',
+        referrer: 'a.com/login',
+        blockedURI: 'inline',
+      });
     });
 
-    test('no-op when not an event', () => {
+    test('strips query from navigation URLs', () => {
+      const beacon: any = {
+        type: 'event',
+        payload: {
+          name: 'faro.navigation',
+          attributes: { fromUrl: 'https://a.com/?ref=mail', toUrl: 'https://a.com/magic?token=x' },
+        },
+      };
+      expect(sanitizeEventUrls(beacon).payload.attributes).toEqual({
+        fromUrl: 'a.com/',
+        toUrl: 'a.com/magic',
+      });
+    });
+
+    test('no-op for beacons that are not events', () => {
       const beacon: any = {
         type: 'measurement',
-        payload: { name: 'faro.performance.resource', attributes: { name: 'https://a/1' } },
+        payload: { attributes: { name: 'https://a.com/1234567' } },
       };
-      const out = sanitizeResourceTimingUrl(beacon);
-      expect(out).toEqual(beacon);
+      expect(sanitizeEventUrls(beacon)).toBe(beacon);
     });
   });
 });

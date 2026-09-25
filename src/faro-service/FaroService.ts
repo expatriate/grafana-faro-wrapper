@@ -10,7 +10,7 @@ import { parseMetricLabels } from '../metrics-service/helpers/parseMetricLabels.
 import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
-import { sanitizeResourceTimingUrl, sanitizePageUrl } from '../utils/sanitizers.ts';
+import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';
 
 export interface FaroConfig {
   faroUrl: string;
@@ -23,11 +23,7 @@ type OtlpTransform = NonNullable<
   ConstructorParameters<typeof OtlpHttpTransport>[0]['otlpTransform']
 >;
 
-const DEFAULT_SANITIZERS: Sanitizer[] = [
-  sanitizePageUrl,
-  sanitizeResourceTimingUrl,
-  parseMetricLabels,
-];
+const DEFAULT_SANITIZERS: Sanitizer[] = [sanitizePageUrl, sanitizeEventUrls, parseMetricLabels];
 
 const OTLP_LOG_BODIES: OtlpTransform = {
   createMeasurementLogBody({ payload }) {

@@ -4,6 +4,7 @@ const LONG_HEX_ID = /\b[0-9a-f]{12,}\b/g;
 const NUMERIC_ID = /\b\d{6,}\b/g;
 
 const ID_PATTERNS = [UUID_WITH_OPTIONAL_SUFFIX, LONG_HEX_ID, NUMERIC_ID];
+const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
 
 export function sanitizeUrl(input: string): string {
   try {
@@ -33,19 +34,20 @@ export function sanitizePageUrl(beacon: Record<string, any>): Record<string, any
   };
 }
 
-export function sanitizeResourceTimingUrl(beacon: Record<string, any>): Record<string, any> {
-  const isResourceTiming =
-    beacon.type === 'event' && beacon.payload?.name === 'faro.performance.resource';
-  if (!isResourceTiming || !beacon.payload.attributes?.name) return beacon;
+export function sanitizeEventUrls(beacon: Record<string, any>): Record<string, any> {
+  const attributes = beacon.type === 'event' ? beacon.payload?.attributes : undefined;
+  if (!attributes) return beacon;
 
   return {
     ...beacon,
     payload: {
       ...beacon.payload,
-      attributes: {
-        ...beacon.payload.attributes,
-        name: sanitizeUrl(beacon.payload.attributes.name),
-      },
+      attributes: Object.fromEntries(
+        Object.entries(attributes).map(([key, value]) => [
+          key,
+          typeof value === 'string' && ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value,
+        ]),
+      ),
     },
   };
 }

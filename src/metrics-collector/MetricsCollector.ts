@@ -34,21 +34,12 @@ export interface MetricsCollectorConfig<T extends string = string> {
 
 export interface MetricsCollectorStatus<T extends string = string> {
   state: MetricsCollectorState;
-  isRunning: boolean;
-  isDone: boolean;
-  isPaused: boolean;
   runningTime: number;
   pausedDuration: number;
   remainingTime: number | undefined;
   registeredSteps: T[];
   completedSteps: [T, boolean][];
   pendingSteps: T[];
-  /** @deprecated Use registeredSteps. */
-  registeredMetrics: T[];
-  /** @deprecated Use completedSteps. */
-  completedMetrics: [T, boolean][];
-  /** @deprecated Use pendingSteps. */
-  pendingMetrics: T[];
 }
 
 export interface MetricsCollectorCallback<T extends string = string> {
@@ -132,9 +123,6 @@ export class MetricsCollector<T extends string = string> {
     const pendingSteps = this.steps.filter((step) => !this.stepResults.has(step));
     return {
       state: kind,
-      isRunning: kind === 'running' || kind === 'paused' || kind === 'finishing',
-      isDone: this.isFinished(),
-      isPaused: kind === 'paused',
       runningTime,
       pausedDuration: kind === 'idle' ? 0 : this.state.clock.pausedDuration,
       remainingTime:
@@ -142,9 +130,6 @@ export class MetricsCollector<T extends string = string> {
       registeredSteps,
       completedSteps,
       pendingSteps,
-      registeredMetrics: registeredSteps,
-      completedMetrics: completedSteps,
-      pendingMetrics: pendingSteps,
     };
   }
 
@@ -160,11 +145,6 @@ export class MetricsCollector<T extends string = string> {
     this.checkSteps();
 
     return this;
-  }
-
-  /** @deprecated Use addStep. */
-  addMetricStep(key: T, fn: StepCheck, conditionFn?: StepReadinessCheck): this {
-    return this.addStep(key, fn, conditionFn);
   }
 
   reset(): this {

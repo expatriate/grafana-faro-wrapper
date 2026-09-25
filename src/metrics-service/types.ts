@@ -24,8 +24,3 @@ export type MetricUnit =
 export type MetricLabels = Record<string, string | Record<string, string>>;
 
 export type MetricType = 'histogram' | 'counter' | 'gauge';
-
-/** @deprecated Use CustomMetric. */
-export type CustomMetricBase = CustomMetric;
-/** @deprecated Use MetricLabels. */
-export type MetricLabel = MetricLabels;

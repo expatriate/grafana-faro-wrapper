@@ -103,7 +103,7 @@ describe('MetricsCollector', () => {
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: true } }));
-    expect(collector.getStatus()).toMatchObject({ isRunning: false, isDone: true });
+    expect(collector.getStatus().state).toBe('done');
   });
 
   test('status time stands still while paused and after the run finishes', async () => {

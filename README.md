@@ -240,8 +240,7 @@ pageReady.addStep(
   при размонтировании компонента, вызывайте `reset()`.
 - `getStatus()` возвращает `state` — `idle`, `running`, `paused`, `finishing` (итог определён, колбэк ещё
   не вызван) или `done`, — а также `runningTime`, `pausedDuration`, `remainingTime` и списки `registeredSteps`,
-  `completedSteps`, `pendingSteps`. Флаги `isRunning`, `isPaused` и `isDone` оставлены для совместимости:
-  `isRunning` истинен в `running`, `paused` и `finishing`, `isDone` — в `finishing` и `done`.
+  `completedSteps`, `pendingSteps`.
 - `start()`, `pause()`, `resume()`, `reset()` и `addStep()` возвращают сам сборщик, вызовы можно объединять
   в цепочку.
 - `log: true` пишет ход сбора в консоль.
@@ -346,33 +345,6 @@ Faro регистрируется один раз на страницу. Поэ�
 `StepCheck`, `StepReadinessCheck`.
 
 Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
-
-## Миграция с 0.3
-
-- `Sanitizer` принимает и возвращает `TransportItem` из Faro. Санитайзер, объявленный с типом
-  `Record<string, any>`, перестанет проходить проверку типов — уберите аннотацию или используйте `TransportItem`.
-- В `FaroServiceConfig` больше нет полей `url` и `apiKey`: они и раньше не работали вместе с транспортом обёртки.
-- Шаг `MetricsCollector` проверяется сразу при регистрации, поэтому длительности SLO-метрик станут короче —
-  до 100 мс.
-- Переименования; старые имена работают, но помечены как устаревшие и будут удалены в 1.0:
-
-  | Было                                                      | Стало                                               |
-  | --------------------------------------------------------- | --------------------------------------------------- |
-  | `addMetricStep`                                           | `addStep`                                           |
-  | `registeredMetrics`, `completedMetrics`, `pendingMetrics` | `registeredSteps`, `completedSteps`, `pendingSteps` |
-  | `MetricFn`, `ReadyToCheckConditionFn`                     | `StepCheck`, `StepReadinessCheck`                   |
-  | `CustomMetricBase`, `MetricLabel`                         | `CustomMetric`, `MetricLabels`                      |
-
-- `getStatus()` возвращает поле `state`, а `start()`, `pause()`, `resume()` и `reset()` — сам сборщик.
-
-## Миграция с 0.2
-
-- `FaroRoute`, `FaroRoutes` и `withFaroRouterInstrumentation` больше не реэкспортируются — импортируйте их
-  из `@grafana/faro-react`.
-- Peer-зависимость `@grafana/faro-react` заменена на `@grafana/faro-web-sdk`.
-- UMD-бандл переехал в `dist/index.umd.js` и называется `GrafanaFaroWrapper`.
-- `timestamp` в `sendCustomMetric` стал необязательным и теперь действительно задаёт время метрики.
-- `MetricsCollectorCallback.steps` типизирован по именам шагов.
 
 ## Разработка
 

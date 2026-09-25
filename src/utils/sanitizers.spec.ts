@@ -57,14 +57,14 @@ describe('sanitizers', () => {
         meta: { page: { url: 'https://example.com/users/1234567?x=1' } },
         other: 1,
       };
-      const out = sanitizePageUrl(beacon);
+      const out: any = sanitizePageUrl(beacon);
       expect(out.meta.page.url).toBe('example.com/users/:id');
       expect(out.other).toBe(1);
     });
 
     test('no-op when meta.page.url is missing', () => {
       const beacon: any = { meta: {}, foo: 'bar' };
-      const out = sanitizePageUrl(beacon);
+      const out: any = sanitizePageUrl(beacon);
       expect(out).toEqual(beacon);
     });
   });
@@ -78,7 +78,7 @@ describe('sanitizers', () => {
           attributes: { name: 'https://cdn.example.com/assets/1234567.png', duration: '12' },
         },
       };
-      const out = sanitizeEventUrls(beacon);
+      const out: any = sanitizeEventUrls(beacon);
       expect(out.payload.attributes).toEqual({
         name: 'cdn.example.com/assets/:id.png',
         duration: '12',
@@ -97,7 +97,7 @@ describe('sanitizers', () => {
           },
         },
       };
-      expect(sanitizeEventUrls(beacon).payload.attributes).toEqual({
+      expect((sanitizeEventUrls(beacon).payload as any).attributes).toEqual({
         documentURI: 'a.com/orders/:id',
         referrer: 'a.com/login',
         blockedURI: 'inline',
@@ -112,7 +112,7 @@ describe('sanitizers', () => {
           attributes: { fromUrl: 'https://a.com/?ref=mail', toUrl: 'https://a.com/magic?token=x' },
         },
       };
-      expect(sanitizeEventUrls(beacon).payload.attributes).toEqual({
+      expect((sanitizeEventUrls(beacon).payload as any).attributes).toEqual({
         fromUrl: 'a.com/',
         toUrl: 'a.com/magic',
       });

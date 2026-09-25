@@ -1,18 +1,18 @@
+import { MeasurementEvent, TransportItem, TransportItemType } from '@grafana/faro-web-sdk';
 import { MEASUREMENT_KEYS } from '../types.ts';
 
-export function parseMetricLabels(beacon: Record<string, any>): Record<string, any> {
-  const labels = beacon.payload?.context?.[MEASUREMENT_KEYS.LABELS];
-  if (beacon.type !== 'measurement' || beacon.payload?.type !== 'custom' || !labels) return beacon;
+export function parseMetricLabels(beacon: TransportItem): TransportItem {
+  if (beacon.type !== TransportItemType.MEASUREMENT) return beacon;
+  const measurement = beacon.payload as MeasurementEvent | undefined;
+  const labels = measurement?.context?.[MEASUREMENT_KEYS.LABELS];
+  if (measurement?.type !== 'custom' || !labels) return beacon;
 
   try {
     return {
       ...beacon,
       payload: {
-        ...beacon.payload,
-        context: {
-          ...beacon.payload.context,
-          [MEASUREMENT_KEYS.LABELS]: JSON.parse(labels),
-        },
+        ...measurement,
+        context: { ...measurement.context, [MEASUREMENT_KEYS.LABELS]: JSON.parse(labels) },
       },
     };
   } catch {

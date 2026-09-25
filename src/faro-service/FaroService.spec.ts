@@ -99,7 +99,7 @@ describe('FaroService', () => {
     const svc = new FaroService();
     const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
     svc.addSanitizer((beacon) => {
-      beacon.meta.user.email = '[hidden]';
+      beacon.meta.user!.email = '[hidden]';
       return beacon;
     });
     const storedUser = { email: 'john@example.com' };

@@ -2,7 +2,7 @@ import { parseMetricLabels } from './parseMetricLabels.ts';
 
 describe('parseMetricLabels', () => {
   test('restores labels that Faro stringified in a custom measurement context', () => {
-    const beacon = {
+    const beacon: any = {
       type: 'measurement',
       payload: {
         type: 'custom',
@@ -10,15 +10,15 @@ describe('parseMetricLabels', () => {
       },
     };
 
-    expect(parseMetricLabels(beacon).payload.context['measurement.labels']).toEqual({
+    expect((parseMetricLabels(beacon).payload as any).context['measurement.labels']).toEqual({
       step: 'payment',
       geo: { country: 'de' },
     });
   });
 
   test('passes through a measurement without payload and unparsable labels', () => {
-    const withoutPayload = { type: 'measurement' };
-    const brokenLabels = {
+    const withoutPayload: any = { type: 'measurement' };
+    const brokenLabels: any = {
       type: 'measurement',
       payload: { type: 'custom', context: { 'measurement.labels': 'not json' } },
     };

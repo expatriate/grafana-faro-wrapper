@@ -18,9 +18,10 @@ export interface FaroConfig {
   faroKey: string;
 }
 
-export type FaroServiceConfig = FaroConfig & BrowserConfig & { routerAdapter?: Instrumentation };
+export type FaroServiceConfig = FaroConfig &
+  Omit<BrowserConfig, 'url' | 'apiKey'> & { routerAdapter?: Instrumentation };
 
-export type Sanitizer = (beacon: Record<string, any>) => Record<string, any>;
+export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
 type OtlpTransform = NonNullable<
   ConstructorParameters<typeof OtlpHttpTransport>[0]['otlpTransform']
@@ -139,7 +140,7 @@ export class FaroService {
 
   private sanitize(beacon: TransportItem): TransportItem | null {
     try {
-      return this.sanitizers.reduce(
+      return this.sanitizers.reduce<TransportItem>(
         (item, sanitize) => {
           const sanitized = sanitize(item);
           if (typeof sanitized !== 'object' || sanitized === null) {
@@ -147,11 +148,8 @@ export class FaroService {
           }
           return sanitized;
         },
-        {
-          ...beacon,
-          meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)),
-        } as Record<string, any>,
-      ) as TransportItem;
+        { ...beacon, meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)) },
+      );
     } catch (error) {
       if (!this.sanitizerFailureReported) {
         this.sanitizerFailureReported = true;

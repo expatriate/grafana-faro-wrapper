@@ -1,3 +1,5 @@
+import { EventEvent, TransportItem, TransportItemType } from '@grafana/faro-web-sdk';
+
 const UUID_WITH_OPTIONAL_SUFFIX =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[a-z0-9]*\b/g;
 const LONG_HEX_ID = /\b[0-9a-f]{12,}\b/g;
@@ -19,33 +21,29 @@ export function sanitizeUrl(input: string): string {
   }
 }
 
-export function sanitizePageUrl(beacon: Record<string, any>): Record<string, any> {
-  if (!beacon.meta?.page?.url) return beacon;
+export function sanitizePageUrl(beacon: TransportItem): TransportItem {
+  const url = beacon.meta?.page?.url;
+  if (!url) return beacon;
 
   return {
     ...beacon,
-    meta: {
-      ...beacon.meta,
-      page: {
-        ...beacon.meta.page,
-        url: sanitizeUrl(beacon.meta.page.url),
-      },
-    },
+    meta: { ...beacon.meta, page: { ...beacon.meta.page, url: sanitizeUrl(url) } },
   };
 }
 
-export function sanitizeEventUrls(beacon: Record<string, any>): Record<string, any> {
-  const attributes = beacon.type === 'event' ? beacon.payload?.attributes : undefined;
-  if (!attributes) return beacon;
+export function sanitizeEventUrls(beacon: TransportItem): TransportItem {
+  if (beacon.type !== TransportItemType.EVENT) return beacon;
+  const event = beacon.payload as EventEvent;
+  if (!event.attributes) return beacon;
 
   return {
     ...beacon,
     payload: {
-      ...beacon.payload,
+      ...event,
       attributes: Object.fromEntries(
-        Object.entries(attributes).map(([key, value]) => [
+        Object.entries(event.attributes).map(([key, value]) => [
           key,
-          typeof value === 'string' && ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value,
+          ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value,
         ]),
       ),
     },

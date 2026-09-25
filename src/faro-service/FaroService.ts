@@ -7,6 +7,8 @@ import {
   TransportItem,
 } from '@grafana/faro-react';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
+import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
+import { toLogfmt } from '../utils/logfmt.ts';
 import {
   sanitizeContextLabelsValues,
   sanitizeEventUrlParams,
@@ -108,19 +110,20 @@ export class FaroService {
     createMeasurementLogBody?: (item: TransportItem<MeasurementEvent>) => string;
   } {
     return {
-      createMeasurementLogBody(item) {
-        const { payload } = item;
-        const [name, value] = Object.entries(payload.values).flat();
-        const result = payload.context?.result;
+      createMeasurementLogBody({ payload }) {
+        const [[name, value] = [], ...extraValues] = Object.entries(payload.values);
 
-        return (
-          `faro_signal=measurement type=${payload.type} name=${name} value=${value}` +
-          (result ? ` result=${result}` : '')
-        );
+        return toLogfmt({
+          faro_signal: 'measurement',
+          type: payload.type,
+          name,
+          value,
+          ...Object.fromEntries(extraValues.map(([key, extra]) => [`value_${key}`, extra])),
+          result: payload.context?.[MEASUREMENT_KEYS.RESULT],
+        });
       },
-      createErrorLogBody(item: any) {
-        const { payload } = item;
-        return `faro_signal=error type=${payload.type} message="${payload.value}"`;
+      createErrorLogBody({ payload }: any) {
+        return toLogfmt({ faro_signal: 'error', type: payload.type, message: payload.value });
       },
     };
   }

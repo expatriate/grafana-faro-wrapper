@@ -1,3 +1,4 @@
+import { constructMetricContext } from '../metrics-service/helpers/constructMetricContext.ts';
 import { FaroService } from './FaroService.ts';
 
 jest.mock('@grafana/faro-react', () => ({
@@ -98,26 +99,52 @@ describe('FaroService', () => {
     expect(result.fromUser).toBe(true);
   });
 
-  test('createOtlpTransforms формирует корректную строку для измерений и ошибок', () => {
-    const svc = new FaroService();
-    // доступ к приватному методу через any
-    const transforms = (svc as any).createOtlpTransforms();
-    expect(typeof transforms.createMeasurementLogBody).toBe('function');
-    expect(typeof transforms.createErrorLogBody).toBe('function');
+  describe('OTLP log body', () => {
+    function initTransforms() {
+      new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);
+      return (OtlpHttpTransport as jest.Mock).mock.calls[0][0].otlpTransform;
+    }
 
-    const measurement = transforms.createMeasurementLogBody({
-      payload: { type: 'custom', values: { my_metric: 123 }, context: { result: 'ok' } },
-    } as any);
-    expect(measurement).toContain('faro_signal=measurement');
-    expect(measurement).toContain('name=my_metric');
-    expect(measurement).toContain('value=123');
-    expect(measurement).toContain('result=ok');
+    test('includes the result of a metric sent through MetricsService', () => {
+      const context = constructMetricContext({
+        description: 'checkout completed',
+        unit: 'EVENTS',
+        type: 'counter',
+        result: 'success',
+      });
 
-    const error = transforms.createErrorLogBody({
-      payload: { type: 'error', value: 'some error message' },
-    } as any);
-    expect(error).toContain('faro_signal=error');
-    expect(error).toContain('message="some error message"');
+      const body = initTransforms().createMeasurementLogBody({
+        payload: { type: 'custom', values: { checkout: 1 }, context },
+      });
+
+      expect(body).toBe('faro_signal=measurement type=custom name=checkout value=1 result=success');
+    });
+
+    test('keeps every value of a multi-value measurement', () => {
+      const body = initTransforms().createMeasurementLogBody({
+        payload: { type: 'web-vitals', values: { lcp: 1200, delta: 50 } },
+      });
+
+      expect(body).toBe('faro_signal=measurement type=web-vitals name=lcp value=1200 value_delta=50');
+    });
+
+    test('escapes quotes and line breaks in an error message', () => {
+      const body = initTransforms().createErrorLogBody({
+        payload: { type: 'SyntaxError', value: 'Unexpected "token"\n  at parse (app.js:1)' },
+      });
+
+      expect(body).toBe(
+        'faro_signal=error type=SyntaxError message="Unexpected \\"token\\"\\n  at parse (app.js:1)"',
+      );
+    });
+
+    test('quotes a metric name containing spaces', () => {
+      const body = initTransforms().createMeasurementLogBody({
+        payload: { type: 'custom', values: { 'page load': 5 } },
+      });
+
+      expect(body).toBe('faro_signal=measurement type=custom name="page load" value=5');
+    });
   });
 
   test('destroy сбрасывает состояние', () => {

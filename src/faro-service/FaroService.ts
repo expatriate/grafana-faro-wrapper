@@ -88,7 +88,7 @@ export class FaroService {
           ...beacon,
         } as Record<string, any>) as TransportItem;
 
-        return beforeSend?.(sanitized) ?? sanitized;
+        return beforeSend ? beforeSend(sanitized) : sanitized;
       },
 
       ...rest,

@@ -85,6 +85,16 @@ describe('FaroService', () => {
     expect(result.fromUser).toBe(true);
   });
 
+  test('a user beforeSend returning null drops the beacon', () => {
+    const faro: any = new FaroService().init({
+      faroUrl: 'u',
+      faroKey: 'k',
+      beforeSend: () => null,
+    } as any);
+
+    expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
+  });
+
   describe('OTLP log body', () => {
     function initTransforms() {
       new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);

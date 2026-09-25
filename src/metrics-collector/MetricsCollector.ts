@@ -195,12 +195,13 @@ export class MetricsCollector<T extends string = string> {
     const cycle = this.cycle;
     const pendingChecks = Array.from(this.metrics.entries())
       .filter(([key]) => !this.metricsResults.has(key) && !this.checksInProgress.has(key))
-      .map(async ([key, metricFns]) => {
-        if (metricFns.conditionFn && !metricFns.conditionFn()) {
+      .map(async ([key, { fn, conditionFn }]) => {
+        const check = this.checkIfReady(key, fn, conditionFn);
+        if (!check) {
           return;
         }
         this.checksInProgress.add(key);
-        const passed = await this.runCheck(key, metricFns.fn);
+        const passed = await this.runCheck(key, check);
         if (cycle !== this.cycle) {
           return;
         }
@@ -216,6 +217,19 @@ export class MetricsCollector<T extends string = string> {
 
     this.debug('checkSteps:results', this.metricsResults);
     this.checkMetricsResults();
+  }
+
+  private checkIfReady(
+    key: T,
+    fn: MetricFn,
+    conditionFn?: ReadyToCheckConditionFn,
+  ): MetricFn | undefined {
+    try {
+      return !conditionFn || conditionFn() ? fn : undefined;
+    } catch {
+      this.debug('checkSteps:conditionError', key);
+      return () => false;
+    }
   }
 
   private async runCheck(key: T, fn: MetricFn): Promise<boolean> {

@@ -71,6 +71,24 @@ describe('MetricsCollector', () => {
     );
   });
 
+  test('treats a throwing readiness condition as a failed step', async () => {
+    const { collector, onFail } = createCollector();
+
+    collector.addMetricStep('render', () => true);
+    collector.addMetricStep(
+      'data',
+      () => true,
+      () => {
+        throw new Error('boom');
+      },
+    );
+    await advance(CHECK_INTERVAL);
+
+    expect(onFail).toHaveBeenCalledWith(
+      expect.objectContaining({ steps: { render: true, data: false } }),
+    );
+  });
+
   test('fails with pending steps as false when failTime elapses', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 

@@ -37,6 +37,17 @@ if (missing.length) {
 }
 console.log(`\n✓ All ${entries.length} declared entry points resolve to built files.`);
 
+const declaredValues = [
+  ...readFileSync(resolve(root, pkg.types), 'utf8').matchAll(/^export \{([^}]*)\};$/gm),
+].flatMap(([, names]) => names.split(',').map((name) => name.trim()));
+const runtimeValues = Object.keys(await import(resolve(root, pkg.module)));
+const typedOnly = declaredValues.filter((name) => !runtimeValues.includes(name));
+if (typedOnly.length) {
+  console.error(`✗ ${pkg.types} declares values missing at runtime: ${typedOnly.join(', ')}`);
+  process.exit(1);
+}
+console.log(`✓ Every value export in ${pkg.types} exists in ${pkg.module}.`);
+
 const browserGlobals = { GrafanaFaroWebSdk: {}, GrafanaFaroTransportOtlpHttp: {} };
 try {
   runInNewContext(readFileSync(resolve(root, pkg.unpkg), 'utf8'), browserGlobals);

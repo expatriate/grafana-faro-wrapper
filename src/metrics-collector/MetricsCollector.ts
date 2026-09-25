@@ -71,7 +71,6 @@ export class MetricsCollector<T extends string = string> {
     this.debug('start');
 
     this.startTime = performance.now();
-    this.checkSteps();
     this.scheduleTimers();
   }
 
@@ -130,6 +129,7 @@ export class MetricsCollector<T extends string = string> {
     this.stepChecks.set(key, { fn, conditionFn });
 
     this.debug('addMetricStep', key);
+    this.checkSteps();
 
     return this;
   }

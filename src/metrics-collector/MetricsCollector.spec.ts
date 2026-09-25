@@ -28,17 +28,17 @@ describe('MetricsCollector', () => {
     jest.useRealTimers();
   });
 
-  test('reports success with every step passed once all checks pass', async () => {
+  test('checks steps as soon as they are registered, without waiting for an interval', async () => {
     const { collector, onSuccess, onFail } = createCollector();
 
     collector.addMetricStep('render', () => true);
     collector.addMetricStep('data', async () => true);
-    await advance(CHECK_INTERVAL);
+    await advance(0);
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledWith({
       timestamp: expect.any(Number),
-      duration: CHECK_INTERVAL,
+      duration: 0,
       steps: { render: true, data: true },
     });
     expect(onFail).not.toHaveBeenCalled();

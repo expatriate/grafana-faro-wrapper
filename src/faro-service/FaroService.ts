@@ -48,9 +48,11 @@ const OTLP_LOG_BODIES: OtlpTransform = {
 
 type FaroIdentity = Pick<FaroConfig & BrowserConfig, 'faroUrl' | 'faroKey' | 'app'>;
 
+type ServiceState =
+  { kind: 'idle' } | { kind: 'active' | 'paused'; faro: Faro; identity: FaroIdentity };
+
 export class FaroService {
-  private instance: Faro | null = null;
-  private registered: { faro: Faro; identity: FaroIdentity } | null = null;
+  private state: ServiceState = { kind: 'idle' };
   private sanitizers = [...DEFAULT_SANITIZERS];
   private userBeforeSend: BrowserConfig['beforeSend'];
   private sanitizerFailureReported = false;
@@ -64,19 +66,19 @@ export class FaroService {
     routerAdapter,
     ...rest
   }: FaroServiceConfig): Faro {
-    if (this.instance) {
+    if (this.state.kind === 'active') {
       console.warn(`${LOG_PREFIX} FaroService already initialized`);
-      return this.instance;
+      return this.state.faro;
     }
 
     this.userBeforeSend = beforeSend;
     const identity = { faroUrl, faroKey, app: rest.app };
 
-    if (this.registered) {
-      this.warnAboutIgnoredChanges(this.registered.identity, identity);
-      this.registered.faro.unpause();
-      this.instance = this.registered.faro;
-      return this.instance;
+    if (this.state.kind === 'paused') {
+      this.warnAboutIgnoredChanges(this.state.identity, identity);
+      this.state.faro.unpause();
+      this.state = { ...this.state, kind: 'active' };
+      return this.state.faro;
     }
 
     const faro = initializeFaro({
@@ -106,8 +108,7 @@ export class FaroService {
       throw new Error(`${LOG_PREFIX} Faro is already registered outside FaroService`);
     }
 
-    this.registered = { faro, identity };
-    this.instance = faro;
+    this.state = { kind: 'active', faro, identity };
     return faro;
   }
 
@@ -117,22 +118,23 @@ export class FaroService {
   }
 
   get isInitialized() {
-    return this.instance !== null;
+    return this.state.kind === 'active';
   }
 
   getInstance(): Faro {
-    if (!this.instance) {
+    if (this.state.kind !== 'active') {
       throw new Error(`${LOG_PREFIX} Faro not initialized. Call init() first.`);
     }
-    return this.instance;
+    return this.state.faro;
   }
 
   destroy() {
-    if (this.instance) {
-      this.instance.pause();
-      this.instance = null;
-      this.sanitizers = [...DEFAULT_SANITIZERS];
+    if (this.state.kind !== 'active') {
+      return;
     }
+    this.state.faro.pause();
+    this.state = { ...this.state, kind: 'paused' };
+    this.sanitizers = [...DEFAULT_SANITIZERS];
   }
 
   private sanitize(beacon: TransportItem): TransportItem | null {

@@ -21,6 +21,10 @@ export class MetricsCollector<T extends string = string> {
 
   private metricsResults = new Map<T, boolean>();
 
+  private checksInProgress = new Set<T>();
+
+  private cycle = 0;
+
   private readonly failTime?: number;
 
   private readonly steps: T[];
@@ -89,7 +93,7 @@ export class MetricsCollector<T extends string = string> {
   }
 
   pause() {
-    if (!this.startTime || !this.isRunning || this.isPaused || this.isDone) {
+    if (this.startTime === undefined || !this.isRunning || this.isPaused || this.isDone) {
       return;
     }
 
@@ -120,6 +124,7 @@ export class MetricsCollector<T extends string = string> {
       console.info('[SLO-metrics:resume]');
     }
 
+    this.checkMetricsResults();
     this.checkSteps();
 
     if (!this.metricStepsCheckInterval) {
@@ -129,7 +134,7 @@ export class MetricsCollector<T extends string = string> {
       );
     }
 
-    if (this.failTime && this.startTime) {
+    if (this.failTime && this.startTime !== undefined) {
       const elapsed = performance.now() - this.startTime - this.pausedDuration;
       const remaining = this.failTime - elapsed;
 
@@ -147,13 +152,13 @@ export class MetricsCollector<T extends string = string> {
       isRunning: this.isRunning,
       isDone: this.isDone,
       isPaused: this.isPaused,
-      runningTime: this.startTime ? now - this.startTime - this.pausedDuration : 0,
+      runningTime: this.startTime !== undefined ? now - this.startTime - this.pausedDuration : 0,
       pausedDuration: this.pausedDuration,
       registeredMetrics: Array.from(this.metrics.keys()),
       completedMetrics: Array.from(this.metricsResults.entries()),
       pendingMetrics: this.steps.filter((step) => !this.metricsResults.has(step)),
       remainingTime:
-        this.failTime && this.startTime
+        this.failTime && this.startTime !== undefined
           ? Math.max(0, this.failTime - (now - this.startTime - this.pausedDuration))
           : undefined,
     };
@@ -164,24 +169,20 @@ export class MetricsCollector<T extends string = string> {
       return;
     }
 
+    const cycle = this.cycle;
     const pendingChecks = Array.from(this.metrics.entries())
-      .filter(([key]) => !this.metricsResults.has(key))
+      .filter(([key]) => !this.metricsResults.has(key) && !this.checksInProgress.has(key))
       .map(async ([key, metricFns]) => {
         if (metricFns.conditionFn && !metricFns.conditionFn()) {
           return;
         }
-        try {
-          const value = await Promise.resolve(metricFns.fn());
-          this.metricsResults.set(key, value);
-          if (this.log) {
-            console.info('[SLO-metrics:checkSteps:result]', key, value);
-          }
-        } catch {
-          this.metricsResults.set(key, false);
-          if (this.log) {
-            console.info('[SLO-metrics:checkSteps:error]', key, false);
-          }
+        this.checksInProgress.add(key);
+        const passed = await this.runCheck(key, metricFns.fn);
+        if (cycle !== this.cycle) {
+          return;
         }
+        this.checksInProgress.delete(key);
+        this.metricsResults.set(key, passed);
       });
 
     if (pendingChecks.length === 0) {
@@ -194,6 +195,21 @@ export class MetricsCollector<T extends string = string> {
       console.info('[SLO-metrics:checkSteps:results]', this.metricsResults);
     }
     this.checkMetricsResults();
+  }
+
+  private async runCheck(key: T, fn: MetricFn): Promise<boolean> {
+    try {
+      const value = await fn();
+      if (this.log) {
+        console.info('[SLO-metrics:checkSteps:result]', key, value);
+      }
+      return value;
+    } catch {
+      if (this.log) {
+        console.info('[SLO-metrics:checkSteps:error]', key, false);
+      }
+      return false;
+    }
   }
 
   private async finish(success: boolean) {
@@ -302,8 +318,10 @@ export class MetricsCollector<T extends string = string> {
     this.cleanupTimeout();
     this.cleanupCheckInterval();
 
+    this.cycle++;
     this.metrics.clear();
     this.metricsResults.clear();
+    this.checksInProgress.clear();
     this.isDone = false;
     this.isRunning = false;
     this.isPaused = false;

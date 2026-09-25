@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Faro ${{ matrix.faro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        faro: ['1.19.0', '2']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts
+      - run: >-
+          npm install --no-save --ignore-scripts
+          @grafana/faro-react@${{ matrix.faro }}
+          @grafana/faro-transport-otlp-http@${{ matrix.faro }}
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:all
+      - run: npm run verify:package

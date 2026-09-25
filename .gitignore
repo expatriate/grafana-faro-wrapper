@@ -1,7 +1,7 @@
 node_modules
 dist
 .DS_Store
-.github
 
 coverage
 docs/
+package-lock.json

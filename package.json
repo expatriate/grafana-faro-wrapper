@@ -1,13 +1,46 @@
 {
-  "name": "faro-react-wrapper",
+  "name": "grafana-faro-wrapper",
   "version": "0.2.0",
-  "description": "Grafana faro react wrapper",
+  "description": "Grafana Faro wrapper for React apps: one-call setup with OTLP transport, URL and label sanitization, custom metrics and step-based SLO collector",
+  "keywords": [
+    "grafana",
+    "faro",
+    "grafana-faro",
+    "observability",
+    "rum",
+    "real-user-monitoring",
+    "frontend-monitoring",
+    "opentelemetry",
+    "otlp",
+    "react",
+    "metrics",
+    "slo"
+  ],
+  "homepage": "https://github.com/expatriate/grafana-faro-wrapper#readme",
+  "bugs": {
+    "url": "https://github.com/expatriate/grafana-faro-wrapper/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/expatriate/grafana-faro-wrapper.git"
+  },
+  "license": "MIT",
+  "author": "expatriate (https://github.com/expatriate)",
   "type": "module",
-  "main": "dist/index.cjs.js",
-  "module": "dist/index.esm.js",
-  "unpkg": "dist/index.umd.min.js",
-  "jsdelivr": "dist/index.umd.min.js",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "unpkg": "dist/react-version/index.umd.js",
+  "jsdelivr": "dist/react-version/index.umd.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
@@ -20,31 +53,29 @@
     "build:min": "npm run clean && rollup -c --environment MINIFY:true",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watchAll",
-    "prepare": "npm run build:all"
+    "typecheck": "tsc --noEmit",
+    "verify:package": "node scripts/check-package-exports.mjs",
+    "prepare": "npm run build:all",
+    "prepublishOnly": "npm run build:all && npm run verify:package"
   },
-  "keywords": [
-    "typescript",
-    "library"
-  ],
-  "author": "vlprojects",
-  "license": "MIT",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^29.0.0",
+    "@grafana/faro-react": "^2.12.1",
+    "@grafana/faro-transport-otlp-http": "^2.12.1",
+    "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
-    "@rollup/plugin-terser": "^0.4.4",
     "@types/jest": "^30.0.0",
-    "jest": "^30.2.0",
-    "rollup": "^4.55.2",
-    "rollup-plugin-dts": "^6.3.0",
-    "ts-jest": "^29.4.5",
+    "jest": "^30.5.2",
+    "rollup": "^4.63.5",
+    "rollup-plugin-dts": "^6.5.1",
+    "ts-jest": "^29.4.14",
     "tslib": "^2.8.1",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "@grafana/faro-react": "^1.19.0",
-    "@grafana/faro-transport-otlp-http": "^1.19.0",
-    "history": "^5.3.0"
+    "@grafana/faro-react": "^1.19.0 || ^2.0.0",
+    "@grafana/faro-transport-otlp-http": "^1.19.0 || ^2.0.0"
   }
 }

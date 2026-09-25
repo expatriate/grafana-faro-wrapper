@@ -1,28 +1,32 @@
-# faro-react-wrapper
+# grafana-faro-wrapper
 
-Обёртка для Grafana Faro с поддержкой React Router и пользовательских метрик.
+[![npm](https://img.shields.io/npm/v/grafana-faro-wrapper)](https://www.npmjs.com/package/grafana-faro-wrapper)
+[![CI](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml/badge.svg)](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/grafana-faro-wrapper)](LICENSE)
+
+Обёртка над [Grafana Faro](https://grafana.com/oss/faro/) для React-приложений: инициализация одним вызовом,
+очистка URL от идентификаторов и пользовательские метрики.
 
 ## Возможности
 
-- Поддержка React Router v4-v7 с автоматическим определением версии
-- Упрощённый сбор и отправка пользовательских метрик
-- Встроенная санитизация URL и чувствительных данных
-- Простая интеграция с Grafana Faro
+- Инициализация Faro с OTLP HTTP-транспортом; тела логов для измерений и ошибок — в logfmt
+- Санитизация: идентификаторы в URL страниц и ресурсов заменяются на `:id`, query и hash отбрасываются
+- Пользовательские метрики с единицей, типом и метками — `MetricsService`
+- SLO-метрика из нескольких шагов с таймаутом и паузой — `MetricsCollector`
+- Инструментация React Router v4–v7 через `routerAdapter`
 
 ## Установка
 
 ```bash
-npm install faro-react-wrapper
+npm install grafana-faro-wrapper @grafana/faro-react @grafana/faro-transport-otlp-http
 ```
 
 ### Peer Dependencies
 
 ```json
 {
-  "@grafana/faro-react": "^1.19.0",
-  "@grafana/faro-transport-otlp-http": "^1.19.0",
-  "history": "^5.3.0",
-  "react-router-dom": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+  "@grafana/faro-react": "^1.19.0 || ^2.0.0",
+  "@grafana/faro-transport-otlp-http": "^1.19.0 || ^2.0.0"
 }
 ```
 
@@ -30,28 +34,48 @@ npm install faro-react-wrapper
 
 ### Инициализация Faro
 
-```typescript
-import { FaroService, getRouterAdapter } from 'faro-react-wrapper';
+```tsx
+import { createReactRouterV6Options, ReactIntegration } from '@grafana/faro-react';
+import { FaroRoutes, FaroService } from 'grafana-faro-wrapper';
+import {
+  createRoutesFromChildren,
+  matchRoutes,
+  Routes,
+  useLocation,
+  useNavigationType,
+} from 'react-router-dom';
 
 const faro = new FaroService();
 
-// Автоматическое определение версии роутера и настройка адаптера
 faro.init({
-  faroUrl: 'https://faro.example.com',
+  faroUrl: 'https://otlp.example.com/v1/logs',
   faroKey: 'your-key',
-  routerAdapter: getRouterAdapter(version),
+  app: { name: 'my-app', version: '1.0.0' },
+  routerAdapter: new ReactIntegration({
+    router: createReactRouterV6Options({
+      createRoutesFromChildren,
+      matchRoutes,
+      Routes,
+      useLocation,
+      useNavigationType,
+    }),
+  }),
 });
 ```
+
+Маршруты оборачиваются в `FaroRoutes` вместо `Routes`.
 
 ### Отправка метрик
 
 ```typescript
-import { MetricsService } from 'faro-react-wrapper';
+import { MetricsService } from 'grafana-faro-wrapper';
 
 const metrics = new MetricsService(faro);
 
 metrics.sendCustomMetric({
+  timestamp: Date.now(),
   name: 'user_action',
+  description: 'Клик по кнопке',
   value: 1,
   unit: 'EVENTS',
   type: 'counter',
@@ -61,6 +85,36 @@ metrics.sendCustomMetric({
   },
 });
 ```
+
+### SLO-метрика из нескольких шагов
+
+`MetricsCollector` ждёт, пока все шаги дадут результат, и вызывает `onSuccess`, если все прошли, или `onFail`,
+если какой-то провалился или истёк `failTime`. Время на паузе в длительность не входит.
+
+```typescript
+import { MetricsCollector } from 'grafana-faro-wrapper';
+
+const pageReady = new MetricsCollector<'data' | 'render'>({
+  steps: ['data', 'render'],
+  failTime: 10_000,
+  onSuccess: ({ duration, steps }) => {
+    /* отправить метрику */
+  },
+  onFail: ({ duration, steps }) => {
+    /* отправить метрику */
+  },
+});
+
+pageReady.addMetricStep('data', async () => (await fetchData()).ok);
+pageReady.addMetricStep(
+  'render',
+  () => true,
+  () => isRendered(),
+);
+```
+
+Первый `addMetricStep` запускает отсчёт. Шаг проверяется каждые 100 мс, пока не вернёт результат;
+третий аргумент — условие готовности к проверке. Есть `pause()`, `resume()`, `reset()` и `getStatus()`.
 
 ### Кастомная санитизация URL
 
@@ -92,6 +146,10 @@ faro.addSanitizer((beacon) => {
 
 - `sendCustomMetric(metric)`: Отправка пользовательской метрики
 
+### MetricsCollector
+
+Сбор SLO-метрики из нескольких шагов, см. пример выше.
+
 ### Типы метрик
 
 ```typescript
@@ -110,19 +168,25 @@ type MetricType = 'histogram' | 'counter' | 'gauge';
 ## Разработка
 
 ```bash
-# Установка зависимостей
 npm install
-
-# Разработка
-npm run dev
-
-# Сборка
-npm run build
-
-# Тесты
+npm run dev          # сборка в watch-режиме
+npm run typecheck
 npm test
-npm run test:watch
+npm run build:all
 ```
+
+## Релизы
+
+Релиз выпускается по git-тегу `v*`:
+
+```bash
+npm version minor    # или patch / major / prerelease --preid beta
+git push --follow-tags
+```
+
+Воркфлоу `Release` проверяет, что тег совпадает с версией в `package.json`, прогоняет типы, тесты и сборку,
+публикует пакет в npm через Trusted Publishing и создаёт GitHub Release с заметками из коммитов и PR.
+Версии с суффиксом (`1.0.0-beta.1`) публикуются под dist-tag `next` и помечаются как pre-release.
 
 ## Лицензия
 

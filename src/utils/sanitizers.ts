@@ -1,10 +1,9 @@
-const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}\b/g;
+const UUID_WITH_OPTIONAL_SUFFIX =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[a-z0-9]*\b/g;
 const LONG_HEX_ID = /\b[0-9a-f]{12,}\b/g;
 const NUMERIC_ID = /\b\d{6,}\b/g;
-const UUID_WITH_SUFFIX =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[a-z0-9]+\b/g;
 
-const ID_PATTERNS = [UUID, LONG_HEX_ID, NUMERIC_ID, UUID_WITH_SUFFIX];
+const ID_PATTERNS = [UUID_WITH_OPTIONAL_SUFFIX, LONG_HEX_ID, NUMERIC_ID];
 
 export function sanitizeUrl(input: string): string {
   try {

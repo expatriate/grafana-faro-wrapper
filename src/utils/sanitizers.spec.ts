@@ -8,6 +8,18 @@ describe('sanitizers', () => {
       expect(out).toBe('example.com/users/:id/profile');
     });
 
+    test('replaces UUIDs of any version, including v7, with :id', () => {
+      expect(sanitizeUrl('https://a.com/orders/0190a6e2-7c3b-7d4e-9f00-1a2b3c4d5e6f')).toBe(
+        'a.com/orders/:id',
+      );
+    });
+
+    test('replaces a UUID followed by a hex suffix with a single :id', () => {
+      expect(sanitizeUrl('https://a.com/x/550e8400-e29b-41d4-a716-446655440000abc')).toBe(
+        'a.com/x/:id',
+      );
+    });
+
     test('replaces long hex segment with :id', () => {
       const input = 'https://example.com/a/abcdef1234567890abcd/details';
       const out = sanitizeUrl(input);

@@ -37,7 +37,7 @@ if (missing.length) {
 }
 console.log(`\n✓ All ${entries.length} declared entry points resolve to built files.`);
 
-const browserGlobals = { GrafanaFaroReact: {}, GrafanaFaroTransportOtlpHttp: {} };
+const browserGlobals = { GrafanaFaroWebSdk: {}, GrafanaFaroTransportOtlpHttp: {} };
 try {
   runInNewContext(readFileSync(resolve(root, pkg.unpkg), 'utf8'), browserGlobals);
 } catch (error) {

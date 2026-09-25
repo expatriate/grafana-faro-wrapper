@@ -1,7 +1,7 @@
 import { constructMetricContext } from '../metrics-service/helpers/constructMetricContext.ts';
 import { FaroService } from './FaroService.ts';
 
-jest.mock('@grafana/faro-react', () => ({
+jest.mock('@grafana/faro-web-sdk', () => ({
   initializeFaro: jest.fn((cfg) => ({
     ...cfg,
     paused: false,
@@ -21,7 +21,7 @@ jest.mock('@grafana/faro-transport-otlp-http', () => ({
   }),
 }));
 
-const { initializeFaro } = jest.requireMock('@grafana/faro-react');
+const { initializeFaro } = jest.requireMock('@grafana/faro-web-sdk');
 const { OtlpHttpTransport } = jest.requireMock('@grafana/faro-transport-otlp-http');
 
 describe('FaroService', () => {

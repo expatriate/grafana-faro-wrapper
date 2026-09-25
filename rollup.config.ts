@@ -3,7 +3,7 @@ import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
 
 const globals = {
-  '@grafana/faro-react': 'GrafanaFaroReact',
+  '@grafana/faro-web-sdk': 'GrafanaFaroWebSdk',
   '@grafana/faro-transport-otlp-http': 'GrafanaFaroTransportOtlpHttp',
 };
 const external = Object.keys(globals);

@@ -2,9 +2,9 @@ import {
   BrowserConfig,
   Faro,
   initializeFaro,
-  ReactIntegration,
+  Instrumentation,
   TransportItem,
-} from '@grafana/faro-react';
+} from '@grafana/faro-web-sdk';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
 import { parseMetricLabels } from '../metrics-service/helpers/parseMetricLabels.ts';
 import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
@@ -59,7 +59,7 @@ export class FaroService {
     beforeSend,
     routerAdapter,
     ...rest
-  }: FaroConfig & BrowserConfig & { routerAdapter?: ReactIntegration }): Faro {
+  }: FaroConfig & BrowserConfig & { routerAdapter?: Instrumentation }): Faro {
     if (this.instance) {
       console.warn('[Faro-react-wrapper] FaroService already initialized');
       return this.instance;

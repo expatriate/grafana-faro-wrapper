@@ -4,8 +4,8 @@
 [![CI](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml/badge.svg)](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grafana-faro-wrapper)](LICENSE)
 
-Обёртка над [Grafana Faro](https://grafana.com/oss/faro/) для React-приложений: инициализация одним вызовом,
-очистка URL от идентификаторов и пользовательские метрики.
+Обёртка над [Grafana Faro](https://grafana.com/oss/faro/) для обычных веб-страниц и React-приложений:
+инициализация одним вызовом, очистка URL от идентификаторов и пользовательские метрики.
 
 ## Возможности
 
@@ -13,20 +13,23 @@
 - Санитизация: идентификаторы в URL страниц и ресурсов заменяются на `:id`, query и hash отбрасываются
 - Пользовательские метрики с единицей, типом и метками — `MetricsService`
 - SLO-метрика из нескольких шагов с таймаутом и паузой — `MetricsCollector`
-- Инструментация React Router v4–v7 через `routerAdapter`
+- Инструментация React Router v4–v7 через `routerAdapter` — для React-приложений
 
 ## Установка
 
 ```bash
-npm install grafana-faro-wrapper @grafana/faro-react @grafana/faro-transport-otlp-http
+npm install grafana-faro-wrapper @grafana/faro-web-sdk @grafana/faro-transport-otlp-http
 ```
+
+В React-приложении для инструментации роутера нужен ещё `@grafana/faro-react` той же версии, что и
+`@grafana/faro-web-sdk`.
 
 ### Peer Dependencies
 
 ```json
 {
-  "@grafana/faro-react": "^1.19.0 || ^2.0.0",
-  "@grafana/faro-transport-otlp-http": "^1.19.0 || ^2.0.0"
+  "@grafana/faro-transport-otlp-http": "^1.19.0 || ^2.0.0",
+  "@grafana/faro-web-sdk": "^1.19.0 || ^2.0.0"
 }
 ```
 
@@ -35,13 +38,16 @@ npm install grafana-faro-wrapper @grafana/faro-react @grafana/faro-transport-otl
 UMD-бандл берёт Faro из глобалов его собственных IIFE-бандлов, поэтому они подключаются раньше:
 
 ```html
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/@grafana/faro-web-sdk/dist/bundle/faro-web-sdk.iife.js"></script>
-<script src="https://unpkg.com/@grafana/faro-react/dist/bundle/faro-react.iife.js"></script>
 <script src="https://unpkg.com/@grafana/faro-transport-otlp-http/dist/bundle/faro-transport-otlp-http.iife.js"></script>
 <script src="https://unpkg.com/grafana-faro-wrapper"></script>
 <script>
   const faro = new GrafanaFaroWrapper.FaroService();
+  faro.init({
+    faroUrl: 'https://otlp.example.com/v1/logs',
+    faroKey: 'your-key',
+    app: { name: 'my-site' },
+  });
 </script>
 ```
 
@@ -49,9 +55,23 @@ UMD-бандл берёт Faro из глобалов его собственны
 
 ### Инициализация Faro
 
+```typescript
+import { FaroService } from 'grafana-faro-wrapper';
+
+const faro = new FaroService();
+
+faro.init({
+  faroUrl: 'https://otlp.example.com/v1/logs',
+  faroKey: 'your-key',
+  app: { name: 'my-app', version: '1.0.0' },
+});
+```
+
+### React Router
+
 ```tsx
-import { createReactRouterV6Options, ReactIntegration } from '@grafana/faro-react';
-import { FaroRoutes, FaroService } from 'grafana-faro-wrapper';
+import { createReactRouterV6Options, FaroRoutes, ReactIntegration } from '@grafana/faro-react';
+import { FaroService } from 'grafana-faro-wrapper';
 import {
   createRoutesFromChildren,
   matchRoutes,

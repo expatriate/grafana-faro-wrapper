@@ -1,4 +1,3 @@
-export { FaroRoute, FaroRoutes, withFaroRouterInstrumentation } from '@grafana/faro-react';
 export { FaroService } from './faro-service/FaroService.ts';
 export type { FaroConfig, Sanitizer } from './faro-service/FaroService.ts';
 export { MetricsCollector } from './metrics-collector/MetricsCollector.ts';

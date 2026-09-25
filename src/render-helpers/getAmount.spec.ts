@@ -1,4 +1,4 @@
-import { getAmount } from './getAmount.ts';
+import { getAmount } from './getAmount';
 
 test('counts elements matching the selector', () => {
   document.body.innerHTML = '<li></li><li></li>';

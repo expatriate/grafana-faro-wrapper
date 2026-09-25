@@ -1,4 +1,4 @@
-import { SloRun, SloRunConfig, STEP_CHECK_INTERVAL_MS } from './SloRun.ts';
+import { SloRun, SloRunConfig, STEP_CHECK_INTERVAL_MS } from './SloRun';
 
 type Step = 'render' | 'data';
 

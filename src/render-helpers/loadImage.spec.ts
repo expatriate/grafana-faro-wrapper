@@ -1,5 +1,5 @@
-import { stubImageLoading } from './imageStubs.ts';
-import { loadImage } from './loadImage.ts';
+import { stubImageLoading } from './imageStubs';
+import { loadImage } from './loadImage';
 
 afterEach(() => {
   jest.restoreAllMocks();

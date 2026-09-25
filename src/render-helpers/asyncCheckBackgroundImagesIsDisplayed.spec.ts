@@ -1,5 +1,5 @@
-import { asyncCheckBackgroundImagesIsDisplayed } from './asyncCheckBackgroundImagesIsDisplayed.ts';
-import { stubDecodedImage, stubImageLoading } from './imageStubs.ts';
+import { asyncCheckBackgroundImagesIsDisplayed } from './asyncCheckBackgroundImagesIsDisplayed';
+import { stubDecodedImage, stubImageLoading } from './imageStubs';
 
 afterEach(() => {
   jest.restoreAllMocks();

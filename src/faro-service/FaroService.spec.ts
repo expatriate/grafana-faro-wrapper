@@ -1,5 +1,5 @@
-import { constructMetricContext } from '../measurement/constructMetricContext.ts';
-import { FaroService, FaroServiceConfig } from './FaroService.ts';
+import { constructMetricContext } from '../measurement/constructMetricContext';
+import { FaroService, FaroServiceConfig } from './FaroService';
 
 jest.mock('@grafana/faro-web-sdk', () => ({
   ...jest.requireActual('@grafana/faro-web-sdk'),

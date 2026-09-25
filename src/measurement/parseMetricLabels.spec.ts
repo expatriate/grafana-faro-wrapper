@@ -1,4 +1,4 @@
-import { parseMetricLabels } from './parseMetricLabels.ts';
+import { parseMetricLabels } from './parseMetricLabels';
 
 describe('parseMetricLabels', () => {
   test('restores labels that Faro stringified in a custom measurement context', () => {

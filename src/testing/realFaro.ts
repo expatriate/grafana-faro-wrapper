@@ -6,7 +6,7 @@ import {
   TransportItem,
   TransportItemType,
 } from '@grafana/faro-core';
-import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
+import { parseMetricLabels } from '../measurement/parseMetricLabels';
 
 export function createRealFaro(): { faro: Faro; measurements: () => Record<string, any>[] } {
   const delivered: TransportItem[] = [];

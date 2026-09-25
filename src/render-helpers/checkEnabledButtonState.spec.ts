@@ -1,4 +1,4 @@
-import { checkEnabledButtonState } from './checkEnabledButtonState.ts';
+import { checkEnabledButtonState } from './checkEnabledButtonState';
 
 test('passes only for a present button that is neither disabled nor styled as disabled', () => {
   document.body.innerHTML = `

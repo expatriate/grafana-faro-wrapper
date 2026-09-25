@@ -11,19 +11,21 @@ const globals = {
 const external = Object.keys(globals);
 const umdName = 'GrafanaFaroWrapper';
 
-const compileTs = () => typescript({ noEmit: false, rewriteRelativeImportExtensions: true });
+const compileTs = () => typescript({ noEmit: false });
 
-export default [
-  {
-    input: 'src/index.ts',
-    output: [
-      { file: 'dist/index.js', format: 'esm', sourcemap: true },
-      { file: 'dist/index.cjs', format: 'cjs', sourcemap: true },
-      { file: 'dist/index.umd.js', format: 'umd', name: umdName, globals, plugins: [terser()] },
-    ],
-    external,
-    plugins: [compileTs()],
-  },
+const library = {
+  input: 'src/index.ts',
+  output: [
+    { file: 'dist/index.js', format: 'esm', sourcemap: true },
+    { file: 'dist/index.cjs', format: 'cjs', sourcemap: true },
+    { file: 'dist/index.umd.js', format: 'umd', name: umdName, globals, plugins: [terser()] },
+  ],
+  external,
+  plugins: [compileTs()],
+};
+
+const bundles = [
+  library,
   {
     input: 'src/index.ts',
     output: { file: 'dist/index.umd.full.js', format: 'umd', name: umdName, plugins: [terser()] },
@@ -35,3 +37,5 @@ export default [
     plugins: [dts()],
   },
 ];
+
+export default process.env.ROLLUP_WATCH ? library : bundles;

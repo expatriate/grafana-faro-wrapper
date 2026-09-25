@@ -1,4 +1,4 @@
-import { LOG_PREFIX } from '../utils/logPrefix.ts';
+import { LOG_PREFIX } from '../utils/logPrefix';
 import {
   SloRunOptions,
   SloRunResult,
@@ -6,7 +6,7 @@ import {
   StepCheck,
   StepConfig,
   StepResults,
-} from './types.ts';
+} from './types';
 
 export const STEP_CHECK_INTERVAL_MS = 100;
 
@@ -103,6 +103,7 @@ export class SloRun<S extends string> {
     }
     this.clearTimers();
     this.current = { kind: 'disposed' };
+    this.release();
     this.debug('dispose');
   }
 
@@ -214,8 +215,15 @@ export class SloRun<S extends string> {
       passed: Object.values(steps).every(Boolean),
       steps,
     };
+    this.release();
     this.debug('finish', result.duration, result.steps);
     this.onFinish(result);
+  }
+
+  private release() {
+    this.steps.clear();
+    this.results.clear();
+    this.checksInProgress.clear();
   }
 
   private clearTimers() {

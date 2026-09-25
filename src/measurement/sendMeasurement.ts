@@ -1,7 +1,7 @@
 import { Faro } from '@grafana/faro-web-sdk';
-import { constructMetricContext } from './constructMetricContext.ts';
-import { CUSTOM_MEASUREMENT_TYPE } from './keys.ts';
-import { Metric } from './types.ts';
+import { constructMetricContext } from './constructMetricContext';
+import { CUSTOM_MEASUREMENT_TYPE } from './keys';
+import { Metric } from './types';
 
 export function sendMeasurement(faro: Faro, { name, value, timestamp, ...rest }: Metric) {
   const numeric = Number.isNaN(Number(value)) ? 0 : Number(value);

@@ -394,6 +394,7 @@ npm run format           # Prettier; в CI — format:check
 npm test
 npm run build
 npm run verify:package   # точки входа, типы и загрузка UMD
+npm run verify:readme    # примеры README проходят проверку типов; их внешние функции объявлены в скрипте
 ```
 
 ## Релизы

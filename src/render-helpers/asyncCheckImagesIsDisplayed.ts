@@ -1,4 +1,4 @@
-import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages.ts';
+import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages';
 
 export function asyncCheckImagesIsDisplayed(
   selector: string,

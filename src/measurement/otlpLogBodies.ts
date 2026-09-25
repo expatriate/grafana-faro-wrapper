@@ -1,6 +1,6 @@
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
-import { toLogfmt } from '../utils/logfmt.ts';
-import { MEASUREMENT_KEYS } from './keys.ts';
+import { toLogfmt } from '../utils/logfmt';
+import { MEASUREMENT_KEYS } from './keys';
 
 type OtlpTransform = NonNullable<
   ConstructorParameters<typeof OtlpHttpTransport>[0]['otlpTransform']

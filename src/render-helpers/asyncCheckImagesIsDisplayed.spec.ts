@@ -1,5 +1,5 @@
-import { asyncCheckImagesIsDisplayed } from './asyncCheckImagesIsDisplayed.ts';
-import { renderImages, stubDecodedImage } from './imageStubs.ts';
+import { asyncCheckImagesIsDisplayed } from './asyncCheckImagesIsDisplayed';
+import { renderImages, stubDecodedImage } from './imageStubs';
 
 afterEach(() => {
   jest.useRealTimers();

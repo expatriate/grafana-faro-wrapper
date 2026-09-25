@@ -1,5 +1,5 @@
-import { MEASUREMENT_KEYS } from './keys.ts';
-import { Metric } from './types.ts';
+import { MEASUREMENT_KEYS } from './keys';
+import { Metric } from './types';
 
 export function constructMetricContext({
   description,

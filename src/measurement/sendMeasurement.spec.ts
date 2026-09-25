@@ -1,6 +1,6 @@
-import { createRealFaro } from '../testing/realFaro.ts';
-import { sendMeasurement } from './sendMeasurement.ts';
-import { Metric } from './types.ts';
+import { createRealFaro } from '../testing/realFaro';
+import { sendMeasurement } from './sendMeasurement';
+import { Metric } from './types';
 
 function sendThroughRealFaro(...metrics: Metric[]): Record<string, any>[] {
   const { faro, measurements } = createRealFaro();

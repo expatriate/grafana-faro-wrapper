@@ -4,16 +4,14 @@ import {
   Faro,
   initializeFaro,
   Instrumentation,
-  TransportItem,
 } from '@grafana/faro-web-sdk';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
-import { OTLP_LOG_BODIES } from '../measurement/otlpLogBodies.ts';
-import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
-import { sendMeasurement } from '../measurement/sendMeasurement.ts';
-import { Metric } from '../measurement/types.ts';
-import { SloConfig, SloTracker, trackSlo } from '../slo/trackSlo.ts';
-import { LOG_PREFIX } from '../utils/logPrefix.ts';
-import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';
+import { OTLP_LOG_BODIES } from '../measurement/otlpLogBodies';
+import { sendMeasurement } from '../measurement/sendMeasurement';
+import { Metric } from '../measurement/types';
+import { SloConfig, SloTracker, trackSlo } from '../slo/trackSlo';
+import { LOG_PREFIX } from '../utils/logPrefix';
+import { Sanitizer, SanitizerPipeline } from './SanitizerPipeline';
 
 export interface FaroConfig {
   faroUrl: string;
@@ -26,9 +24,7 @@ export type FaroServiceConfig = FaroConfig &
     enabled?: boolean;
   };
 
-export type Sanitizer = (beacon: TransportItem) => TransportItem;
-
-const DEFAULT_SANITIZERS: Sanitizer[] = [sanitizePageUrl, sanitizeEventUrls, parseMetricLabels];
+export type { Sanitizer } from './SanitizerPipeline';
 
 type FaroIdentity = Pick<FaroServiceConfig, 'faroUrl' | 'faroKey' | 'app'>;
 
@@ -48,9 +44,8 @@ type ServiceState =
 
 export class FaroService {
   private state: ServiceState = { kind: 'idle' };
-  private sanitizers = [...DEFAULT_SANITIZERS];
+  private sanitizers = new SanitizerPipeline();
   private userBeforeSend: BrowserConfig['beforeSend'];
-  private sanitizerFailureReported = false;
 
   init({
     faroKey,
@@ -91,7 +86,7 @@ export class FaroService {
       paused: !enabled,
 
       beforeSend: (beacon) => {
-        const sanitized = this.sanitize(beacon);
+        const sanitized = this.sanitizers.run(beacon);
         if (!sanitized) {
           return null;
         }
@@ -110,8 +105,7 @@ export class FaroService {
   }
 
   addSanitizer(sanitizer: Sanitizer | Sanitizer[]) {
-    const newSanitizers = Array.isArray(sanitizer) ? sanitizer : [sanitizer];
-    this.sanitizers = [...this.sanitizers, ...newSanitizers];
+    this.sanitizers.add(Array.isArray(sanitizer) ? sanitizer : [sanitizer]);
   }
 
   sendMetric(metric: Metric) {
@@ -146,27 +140,6 @@ export class FaroService {
     }
     this.state.faro.pause();
     this.state = { ...this.state, kind: 'paused' };
-    this.sanitizers = [...DEFAULT_SANITIZERS];
-  }
-
-  private sanitize(beacon: TransportItem): TransportItem | null {
-    try {
-      return this.sanitizers.reduce<TransportItem>(
-        (item, sanitize) => {
-          const sanitized = sanitize(item);
-          if (typeof sanitized !== 'object' || sanitized === null) {
-            throw new TypeError('sanitizer returned no beacon');
-          }
-          return sanitized;
-        },
-        { ...beacon, meta: JSON.parse(JSON.stringify(beacon.meta)) },
-      );
-    } catch (error) {
-      if (!this.sanitizerFailureReported) {
-        this.sanitizerFailureReported = true;
-        console.warn(`${LOG_PREFIX} A sanitizer failed, beacons it fails on are dropped:`, error);
-      }
-      return null;
-    }
+    this.sanitizers.reset();
   }
 }

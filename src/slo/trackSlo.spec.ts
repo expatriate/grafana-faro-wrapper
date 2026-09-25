@@ -1,7 +1,7 @@
-import { createRealFaro } from '../testing/realFaro.ts';
-import { sendMeasurement } from '../measurement/sendMeasurement.ts';
-import { STEP_CHECK_INTERVAL_MS } from './SloRun.ts';
-import { SloConfig, trackSlo } from './trackSlo.ts';
+import { createRealFaro } from '../testing/realFaro';
+import { sendMeasurement } from '../measurement/sendMeasurement';
+import { STEP_CHECK_INTERVAL_MS } from './SloRun';
+import { SloConfig, trackSlo } from './trackSlo';
 
 function trackThroughRealFaro<S extends string>(config: SloConfig<S>) {
   const { faro, measurements } = createRealFaro();

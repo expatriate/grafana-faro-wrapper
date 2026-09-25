@@ -1,8 +1,8 @@
-import { Metric, MetricLabels, MetricResult } from '../measurement/types.ts';
-import { LOG_PREFIX } from '../utils/logPrefix.ts';
-import { SloRun } from './SloRun.ts';
-import { SloRunOptions, SloRunState } from './types.ts';
-import { pauseWhileHidden } from './visibility.ts';
+import { Metric, MetricLabels, MetricResult } from '../measurement/types';
+import { LOG_PREFIX } from '../utils/logPrefix';
+import { SloRun } from './SloRun';
+import { SloRunOptions, SloRunState } from './types';
+import { pauseWhileHidden } from './visibility';
 
 export interface SloConfig<S extends string> extends SloRunOptions<S> {
   name: string;

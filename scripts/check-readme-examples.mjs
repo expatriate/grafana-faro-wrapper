@@ -10,7 +10,7 @@ const imports = new Map();
 const bodies = [];
 for (const [, block] of readme.matchAll(/```typescript\n([\s\S]*?)```/g)) {
   const body = block.replace(/import \{([^}]*)\} from '([^']+)';\n?/g, (_, names, module) => {
-    const target = module === 'grafana-faro-wrapper' ? '../../../src/index.ts' : module;
+    const target = module === 'grafana-faro-wrapper' ? '../../../src/index' : module;
     const known = imports.get(target) ?? new Set();
     names
       .split(',')

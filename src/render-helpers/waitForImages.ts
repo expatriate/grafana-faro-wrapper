@@ -1,5 +1,5 @@
-import { allDisplayed, hasVisiblePixels, imageSource } from './imageRules.ts';
-import { withTimeout } from './withTimeout.ts';
+import { allDisplayed, hasVisiblePixels, imageSource } from './imageRules';
+import { withTimeout } from './withTimeout';
 
 export const DEFAULT_IMAGE_TIMEOUT_MS = 10_000;
 

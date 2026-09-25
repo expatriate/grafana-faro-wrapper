@@ -1,7 +1,7 @@
-import { extractBackgroundUrl } from './extractBackgroundUrl.ts';
-import { allDisplayed } from './imageRules.ts';
-import { loadImage } from './loadImage.ts';
-import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages.ts';
+import { extractBackgroundUrl } from './extractBackgroundUrl';
+import { allDisplayed } from './imageRules';
+import { loadImage } from './loadImage';
+import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages';
 
 function isElementImageDisplayed(element: Element, timeoutMs: number): Promise<boolean> {
   const images =

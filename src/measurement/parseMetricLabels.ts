@@ -1,5 +1,5 @@
 import { MeasurementEvent, TransportItem, TransportItemType } from '@grafana/faro-web-sdk';
-import { CUSTOM_MEASUREMENT_TYPE, MEASUREMENT_KEYS } from './keys.ts';
+import { CUSTOM_MEASUREMENT_TYPE, MEASUREMENT_KEYS } from './keys';
 
 export function parseMetricLabels(beacon: TransportItem): TransportItem {
   if (beacon.type !== TransportItemType.MEASUREMENT) return beacon;

@@ -1,5 +1,5 @@
-import { SloRun, STEP_CHECK_INTERVAL_MS } from './SloRun.ts';
-import { pauseWhileHidden } from './visibility.ts';
+import { SloRun, STEP_CHECK_INTERVAL_MS } from './SloRun';
+import { pauseWhileHidden } from './visibility';
 
 function setTabHidden(hidden: boolean) {
   Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });

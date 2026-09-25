@@ -1,6 +1,6 @@
-import { hasVisiblePixels } from './imageRules.ts';
-import { DEFAULT_IMAGE_TIMEOUT_MS } from './waitForImages.ts';
-import { withTimeout } from './withTimeout.ts';
+import { hasVisiblePixels } from './imageRules';
+import { DEFAULT_IMAGE_TIMEOUT_MS } from './waitForImages';
+import { withTimeout } from './withTimeout';
 
 export async function loadImage(
   src: string,

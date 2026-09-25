@@ -1,4 +1,4 @@
-import { hasVisiblePixels, imageSource } from './imageRules.ts';
+import { hasVisiblePixels, imageSource } from './imageRules';
 
 export function checkImagesIsDisplayed(selector: string): boolean {
   const images = Array.from(document.querySelectorAll<HTMLImageElement>(selector));

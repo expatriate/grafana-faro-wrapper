@@ -1,4 +1,4 @@
-import { extractBackgroundUrl } from './extractBackgroundUrl.ts';
+import { extractBackgroundUrl } from './extractBackgroundUrl';
 
 function backgroundUrlOf(backgroundImage: string) {
   jest

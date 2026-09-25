@@ -1,5 +1,5 @@
-import { checkImagesIsDisplayed } from './checkImagesIsDisplayed.ts';
-import { renderImages, stubDecodedImage } from './imageStubs.ts';
+import { checkImagesIsDisplayed } from './checkImagesIsDisplayed';
+import { renderImages, stubDecodedImage } from './imageStubs';
 
 test('passes when every image has loaded pixels', () => {
   const [logo, banner] = renderImages('https://a.com/logo.png', 'https://a.com/banner.png');

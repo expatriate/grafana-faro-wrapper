@@ -11,7 +11,11 @@ permissions:
 concurrency: release
 
 jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
   release:
+    needs: check
     runs-on: ubuntu-latest
     env:
       TAG: ${{ github.ref_name }}
@@ -31,7 +35,7 @@ jobs:
             exit 1
           fi
 
-      - run: npm run check
+      - run: npm run build
 
       - name: Publish to npm
         run: |

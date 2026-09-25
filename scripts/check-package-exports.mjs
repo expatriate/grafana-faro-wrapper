@@ -1,7 +1,7 @@
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
+import { JSDOM } from 'jsdom';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
@@ -55,35 +55,22 @@ if (typedOnly.length) {
 }
 console.log(`✓ Every value export in ${pkg.types} exists in ${pkg.module}.`);
 
-const loadUmd = (rel, globals) => {
-  const sandbox = { ...globals, console };
-  sandbox.window = sandbox;
-  sandbox.self = sandbox;
-  sandbox.globalThis = sandbox;
+const loadUmd = (rel, globals = {}) => {
+  const { window } = new JSDOM('', { runScripts: 'outside-only', url: 'https://example.test/' });
+  Object.assign(window, globals);
   try {
-    runInNewContext(readFileSync(resolve(root, rel), 'utf8'), sandbox);
+    window.eval(readFileSync(resolve(root, rel), 'utf8'));
   } catch (error) {
-    console.error(`✗ ${rel} fails to load in a browser-like context: ${error.message}`);
+    console.error(`✗ ${rel} fails to load in a browser: ${error.message}`);
     process.exit(1);
   }
-  const umd = sandbox.GrafanaFaroWrapper;
+  const umd = window.GrafanaFaroWrapper;
   if (typeof umd?.FaroService !== 'function' || typeof umd?.checkRender !== 'function') {
     console.error(`✗ ${rel} does not expose GrafanaFaroWrapper.FaroService and the layout helpers`);
     process.exit(1);
   }
-  console.log(`✓ ${rel} loads in a browser-like context as GrafanaFaroWrapper.`);
+  console.log(`✓ ${rel} loads in a browser as GrafanaFaroWrapper.`);
 };
 
 loadUmd(pkg.unpkg, { GrafanaFaroWebSdk: {}, GrafanaFaroTransportOtlpHttp: {} });
-loadUmd('dist/index.umd.full.js', {
-  document: { addEventListener() {}, readyState: 'complete', visibilityState: 'visible' },
-  navigator: { userAgent: 'verify' },
-  location: { href: 'https://example.test/' },
-  addEventListener() {},
-  setTimeout,
-  clearTimeout,
-  setInterval,
-  clearInterval,
-  performance,
-  URL,
-});
+loadUmd('dist/index.umd.full.js');

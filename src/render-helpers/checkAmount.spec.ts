@@ -1,4 +1,4 @@
-import { checkAmount } from './checkAmount.ts';
+import { checkAmount } from './checkAmount';
 
 test('passes only for the exact number of elements', () => {
   document.body.innerHTML = '<li></li><li></li>';

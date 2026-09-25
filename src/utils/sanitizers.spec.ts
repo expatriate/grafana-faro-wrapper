@@ -1,4 +1,4 @@
-import { sanitizeEventUrls, sanitizePageUrl, sanitizeUrl } from './sanitizers.ts';
+import { sanitizeEventUrls, sanitizePageUrl, sanitizeUrl } from './sanitizers';
 
 describe('sanitizers', () => {
   describe('sanitizeUrl', () => {

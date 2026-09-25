@@ -1,4 +1,4 @@
-import { checkGTEAmount } from './checkGTEAmount.ts';
+import { checkGTEAmount } from './checkGTEAmount';
 
 test('passes when there are at least the given number of elements', () => {
   document.body.innerHTML = '<li></li><li></li>';

@@ -5,4 +5,3 @@ export type * from './slo/types.ts';
 export type { SloConfig, SloTracker } from './slo/trackSlo.ts';
 export type * from './measurement/types.ts';
 export * from './render-helpers/index.ts';
-export * as renderHelpers from './render-helpers/index.ts';

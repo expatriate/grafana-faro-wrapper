@@ -243,6 +243,36 @@ useEffect(() => {
 }, [isOpen, view]);
 ```
 
+## Формат метрики
+
+И `sendMetric`, и `trackSlo` отправляют измерение Faro с `type: 'custom'` и одним значением
+`values: { [name]: value }`. Остальное уходит в контекст измерения под ключами `measurement.*`
+(экспортируются как `MEASUREMENT_KEYS`) и попадает в Grafana атрибутом `faro.measurement.context`:
+
+| Ключ                      | Откуда                                       |
+| ------------------------- | -------------------------------------------- |
+| `measurement.unit`        | `unit`                                       |
+| `measurement.metric.type` | `type`                                       |
+| `measurement.result`      | `result` — `success` или `fail`              |
+| `measurement.labels`      | `labels` объектом; типы значений сохраняются |
+| `measurement.buckets`     | `buckets` строкой через запятую              |
+| `measurement.description` | `description`, только если задано            |
+
+Тело лога измерения — logfmt: `faro_signal=measurement type=custom name=page_ready value=1234 result=fail`,
+его удобно разбирать в LogQL через `| logfmt`.
+
+Для `trackSlo` формат фиксирован: `value` — длительность в мс без времени на паузе, `unit: 'MILLISECONDS'`,
+`type: 'histogram'`, `result`, а в `labels` — `status` (то же значение, что `result`), каждый шаг со своим
+`true`/`false` и метки из `labels()`.
+
+### Кардинальность
+
+Метки становятся измерениями в Grafana, поэтому в них должны быть только значения с небольшим числом
+вариантов: статус, вид страницы, количество карточек. Идентификаторы пользователя, сессии, заказа или URL
+в метки не кладите — они уже есть в `meta` бикона, а как метки взорвут кардинальность. Имена шагов идут
+ключами меток, поэтому в них лучше не использовать символы, которые потребуют переименования при
+промоушене в stream-labels (например, `:`), если такой промоушен планируется.
+
 ## Проверки вёрстки
 
 Хелперы проверяют DOM и возвращают `boolean` или `Promise<boolean>`, не бросая исключений, поэтому подходят
@@ -292,9 +322,6 @@ faro.trackSlo({
 - Из `background-image` берётся первый `url()`: у `image-set(...)` это первый вариант, а не тот, что выбрал
   браузер. Фон только из градиента и фоны псевдоэлементов `::before`/`::after` не проверяются.
 
-Те же функции доступны объектом `renderHelpers` — так они назывались в прежней сборке:
-`const { checkRender } = GrafanaFaroWrapper.renderHelpers`.
-
 ## Остановка и повторный запуск
 
 Faro регистрируется один раз на страницу. Поэтому `destroy()` ставит его на паузу и сбрасывает
@@ -332,6 +359,29 @@ Faro регистрируется один раз на страницу. Поэ�
 `SloConfig`, `SloTracker`, `SloRunState`, `SloRunResult`, `StepCheck`, `StepConfig`, `StepResults`.
 
 Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
+
+## Миграция с 0.x
+
+- `MetricsService` удалён: `new MetricsService(faro).sendCustomMetric(m)` → `faro.sendMetric(m)`. Тип
+  `CustomMetric` → `Metric`: `description` необязателен, `status` удалён, `value` — число, `buckets` — числа,
+  метки плоские (`string | number | boolean`), вложенных объектов нет.
+- `MetricsCollector` удалён вместе с `addStep`, условиями готовности, `getStatus()`, `pause()`, `resume()` и
+  `reset()`. Вместо него `faro.trackSlo({ name, failTime, steps })`: шаг — предикат до `true`, пара
+  «проверка + условие готовности» не нужна, отправка встроена, пауза при скрытой вкладке включена по
+  умолчанию, `reset()` → `dispose()`.
+- Типы `MetricFn`, `ReadyToCheckConditionFn`, `MetricsCollectorConfig`, `MetricsCollectorCallback`,
+  `MetricsCollectorStatus` → `StepCheck`, `StepConfig`, `SloConfig`, `SloTracker`, `SloRunResult`.
+- В `FaroServiceConfig` нет `url`, `apiKey` и `paused`; выключение отправки — `enabled: false`.
+- Объекта `renderHelpers` больше нет — хелперы импортируются по именам (`checkRender`, …) или берутся из
+  `GrafanaFaroWrapper.checkRender` в UMD.
+- Первый `url()` из `background-image` и SVG без собственных размеров теперь считаются загруженными (см.
+  «Проверки вёрстки»).
+
+Для страниц без сборщика: глобал `FaroReactWrapper` прежней сборки → `GrafanaFaroWrapper`, один файл
+`dist/index.umd.full.js` вместо бандла с Faro внутри и собственного кода паузы по видимости. Проверьте
+вызовы старого `addMetricStep(name, check, ready)`: лишние аргументы он молча отбрасывал, в `trackSlo` все
+проверки шага объединяются в одном предикате. Условие `if (!params.duration) return` перед отправкой
+отбросит метрики с нулевой длительностью — в `trackSlo` его нет.
 
 ## Разработка
 

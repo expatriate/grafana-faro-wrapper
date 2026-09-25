@@ -51,6 +51,21 @@ test('a finished run sends exactly one histogram with the step results and extra
   });
 });
 
+test('sends the metric when every step passes on the very first check', async () => {
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    steps: { render: () => true, data: () => true },
+  });
+
+  expect(tracker.state).toBe('done');
+  expect(measurements()).toHaveLength(1);
+  expect(measurements()[0].context).toMatchObject({
+    'measurement.result': 'success',
+    'measurement.labels': { status: 'success', render: true, data: true },
+  });
+});
+
 test('a step that misses its deadline makes the run fail and shows which step failed', async () => {
   const { measurements } = trackThroughRealFaro({
     name: 'page_ready',

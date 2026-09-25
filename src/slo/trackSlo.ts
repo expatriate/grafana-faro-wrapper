@@ -29,6 +29,7 @@ export function trackSlo<S extends string>(
   send: (metric: Metric) => void,
   { name, buckets, labels, pauseWhenHidden = true, ...runConfig }: SloConfig<S>,
 ): SloTracker {
+  let unsubscribe = () => {};
   const run = new SloRun<S>({
     ...runConfig,
     onFinish: ({ timestamp, duration, passed, steps }) => {
@@ -46,7 +47,9 @@ export function trackSlo<S extends string>(
       });
     },
   });
-  const unsubscribe = pauseWhenHidden ? pauseWhileHidden(run) : () => {};
+  if (pauseWhenHidden && run.state !== 'done') {
+    unsubscribe = pauseWhileHidden(run);
+  }
 
   return {
     get state() {

@@ -1,7 +1,7 @@
 {
   "name": "grafana-faro-wrapper",
   "version": "1.0.0",
-  "description": "Grafana Faro wrapper for web pages and React apps: one-call setup with OTLP transport, URL and label sanitization, custom metrics and step-based SLO collector",
+  "description": "Grafana Faro wrapper for web pages and React apps: one-call setup with OTLP transport, URL and label sanitization, custom metrics and step-based SLO metrics",
   "keywords": [
     "grafana",
     "faro",

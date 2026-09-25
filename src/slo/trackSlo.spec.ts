@@ -11,6 +11,7 @@ function trackThroughRealFaro<S extends string>(config: SloConfig<S>) {
 
 beforeEach(() => {
   jest.useFakeTimers();
+  document.body.innerHTML = '';
 });
 
 afterEach(() => {
@@ -90,6 +91,41 @@ test('a disposed run sends nothing', async () => {
 
   tracker.dispose();
   await jest.advanceTimersByTimeAsync(1000);
+
+  expect(tracker.state).toBe('disposed');
+  expect(measurements()).toHaveLength(0);
+});
+
+test('a selector in startWhen delays the clock until the element appears', async () => {
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'resellers_ready',
+    failTime: 1000,
+    startWhen: '[data-slo="reseller-link"]',
+    steps: { list: () => true },
+  });
+
+  await jest.advanceTimersByTimeAsync(3000);
+  expect(tracker.state).toBe('waiting');
+  expect(measurements()).toHaveLength(0);
+
+  document.body.insertAdjacentHTML('beforeend', '<a data-slo="reseller-link"></a>');
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
+
+  expect(tracker.state).toBe('done');
+  expect(measurements()[0]).toMatchObject({ values: { resellers_ready: 0 } });
+});
+
+test('disposing while waiting for the element sends nothing when it appears later', async () => {
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'resellers_ready',
+    failTime: 1000,
+    startWhen: '[data-slo="reseller-link"]',
+    steps: { list: () => true },
+  });
+
+  tracker.dispose();
+  document.body.insertAdjacentHTML('beforeend', '<a data-slo="reseller-link"></a>');
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
 
   expect(tracker.state).toBe('disposed');
   expect(measurements()).toHaveLength(0);

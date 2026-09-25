@@ -4,6 +4,7 @@ import {
   InternalLoggerLevel,
   TransportItem,
 } from '@grafana/faro-core';
+import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 import { MetricsService } from './MetricsService.ts';
 import { CustomMetricBase } from './types.ts';
 
@@ -19,6 +20,7 @@ function sendThroughRealFaro(...metrics: CustomMetricBase[]): TransportItem[] {
   const faro = initializeFaro({
     app: { name: 'test' },
     batching: { enabled: false },
+    beforeSend: parseMetricLabels,
     dedupe: true,
     globalObjectKey: 'faroMetricsTest',
     instrumentations: [],
@@ -95,6 +97,14 @@ describe('MetricsService', () => {
     expect((measurement.payload as { timestamp: string }).timestamp).toBe(
       '2026-01-01T00:00:00.000Z',
     );
+  });
+
+  test('delivers labels to the transport as an object after Faro stringifies the context', () => {
+    const [measurement] = sendThroughRealFaro({ ...click, labels: { geo: { country: 'de' } } });
+
+    expect((measurement.payload as any).context['measurement.labels']).toEqual({
+      geo: { country: 'de' },
+    });
   });
 
   test('converts non-numeric value to 0', () => {

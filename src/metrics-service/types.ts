@@ -24,13 +24,3 @@ export type MetricUnit =
 export type MetricLabel = Record<string, string | Record<string, string>>;
 
 export type MetricType = 'histogram' | 'counter' | 'gauge';
-
-export const MEASUREMENT_KEYS = {
-  DESCRIPTION: 'measurement.description',
-  UNIT: 'measurement.unit',
-  TYPE: 'measurement.metric.type',
-  LABELS: 'measurement.labels',
-  STATUS: 'measurement.status',
-  RESULT: 'measurement.result',
-  BUCKETS: 'measurement.buckets',
-} as const;

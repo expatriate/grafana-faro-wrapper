@@ -7,8 +7,8 @@ import {
   TransportItem,
 } from '@grafana/faro-web-sdk';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
-import { parseMetricLabels } from '../metrics-service/helpers/parseMetricLabels.ts';
-import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
+import { MEASUREMENT_KEYS } from '../measurement/keys.ts';
+import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';

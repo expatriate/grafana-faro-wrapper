@@ -1,4 +1,5 @@
 import { FaroService } from '../faro-service/FaroService.ts';
+import { CUSTOM_MEASUREMENT_TYPE } from '../measurement/keys.ts';
 import { safeNumberConversion } from '../utils/helpers.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { constructMetricContext } from './helpers/constructMetricContext.ts';
@@ -13,7 +14,7 @@ export class MetricsService {
 
       faroInstance.api.pushMeasurement(
         {
-          type: 'custom',
+          type: CUSTOM_MEASUREMENT_TYPE,
           values: { [name]: safeNumberConversion(value) },
         },
         {

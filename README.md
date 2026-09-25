@@ -4,18 +4,20 @@
 [![CI](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml/badge.svg)](https://github.com/expatriate/grafana-faro-wrapper/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/grafana-faro-wrapper)](LICENSE)
 
-Обёртка над [Grafana Faro](https://grafana.com/oss/faro/) для обычных веб-страниц и React-приложений.
-Подключает Faro одним вызовом с отправкой по OTLP, убирает идентификаторы из URL и добавляет пользовательские
-метрики и SLO-метрики из нескольких шагов.
+Обёртка над [Grafana Faro](https://grafana.com/oss/faro/) — SDK, который собирает с фронтенда ошибки, Web
+Vitals и события и отправляет их в Grafana. Пакет подключает Faro к обычной HTML-странице или React-приложению
+одним вызовом и добавляет то, чего в Faro нет:
 
-- **`FaroService`** — инициализация Faro с OTLP HTTP-транспортом, санитизация биконов, пауза и повторный запуск.
-- **`sendMetric`** — пользовательские метрики с единицей, типом, метками и результатом.
-- **`trackSlo`** — SLO-метрика: ждёт, пока пройдут все шаги, с дедлайнами, паузой при скрытой вкладке и
-  отправкой в едином формате.
-- **Проверки вёрстки** — готовые проверки для шагов: элементы отрисованы, их достаточно, картинки и фоны
+- **Отправка по OTLP** — логи и измерения уходят в OTLP-эндпоинт, тела логов в logfmt, разбираются в LogQL.
+- **Санитизация** — из URL страниц и ресурсов убираются идентификаторы, query и hash, чтобы в Grafana не
+  утекали токены и не росла кардинальность.
+- **`sendMetric`** — пользовательская метрика с единицей, типом, метками и результатом в одном вызове.
+- **`trackSlo`** — SLO-метрика «страница дошла до состояния»: шаги с дедлайнами, пауза при скрытой вкладке,
+  отправка в едином формате.
+- **Проверки вёрстки** — готовые предикаты для шагов: элементы отрисованы, их достаточно, картинки и фоны
   загрузились.
 
-Работает с Faro 2.x. Бандл собран под ES2019 и работает в Chrome 73+, Firefox 69+, Safari 12.1+.
+Работает с Faro 2.x. Бандл собран под ES2019: Chrome 73+, Firefox 69+, Safari 12.1+.
 
 ## Установка
 
@@ -25,35 +27,23 @@ npm install grafana-faro-wrapper @grafana/faro-web-sdk @grafana/faro-transport-o
 
 Для инструментации React Router нужен ещё `@grafana/faro-react` той же версии, что и `@grafana/faro-web-sdk`.
 
-### Без сборщика
+Без сборщика подключите один файл — `dist/index.umd.full.js` содержит Faro внутри и выставляет глобал
+`GrafanaFaroWrapper`:
 
-Пакет подключается к любой HTML-странице. Есть два UMD-бандла, оба выставляют глобал `GrafanaFaroWrapper`:
+```html
+<script src="https://unpkg.com/grafana-faro-wrapper/dist/index.umd.full.js"></script>
+<script>
+  const faro = new GrafanaFaroWrapper.FaroService();
+  faro.init({
+    faroUrl: 'https://otlp.example.com/v1/logs',
+    faroKey: 'your-key',
+    app: { name: 'my-site' },
+  });
+</script>
+```
 
-- `dist/index.umd.full.js` — с Faro внутри, один файл на страницу:
-
-  ```html
-  <script src="https://unpkg.com/grafana-faro-wrapper/dist/index.umd.full.js"></script>
-  <script>
-    const faro = new GrafanaFaroWrapper.FaroService();
-    faro.init({
-      faroUrl: 'https://otlp.example.com/v1/logs',
-      faroKey: 'your-key',
-      app: { name: 'my-site' },
-    });
-  </script>
-  ```
-
-- `dist/index.umd.js` (его отдают `unpkg`/`jsdelivr` по умолчанию) — берёт Faro из глобалов его IIFE-бандлов,
-  поэтому они идут раньше:
-
-  ```html
-  <script src="https://unpkg.com/@grafana/faro-web-sdk@2/dist/bundle/faro-web-sdk.iife.js"></script>
-  <script src="https://unpkg.com/@grafana/faro-transport-otlp-http@2/dist/bundle/faro-transport-otlp-http.iife.js"></script>
-  <script src="https://unpkg.com/grafana-faro-wrapper"></script>
-  ```
-
-Стандартные инструментации Faro (`getWebInstrumentations`) в полном бандле не экспортируются: он собирает
-только то, что передано в `init` явно.
+Второй бандл, `dist/index.umd.js` (его отдают `unpkg` и `jsdelivr` по умолчанию), ждёт IIFE-бандлы
+`@grafana/faro-web-sdk` и `@grafana/faro-transport-otlp-http`, подключённые раньше него.
 
 ## Быстрый старт
 
@@ -72,22 +62,17 @@ faro.init({
 ```
 
 - `faroUrl` — OTLP-эндпоинт для логов, `faroKey` — API-ключ. Трейсы не отправляются.
-- Остальные поля — обычный `BrowserConfig` Faro: `app`, `user`, `sessionTracking`, `batching` и т. д. Полей `url`
-  и `apiKey` в типе нет: их заменяет собственный транспорт обёртки.
-- Свои `transports` добавляются к OTLP-транспорту, а не заменяют его.
-- `enabled: false` инициализирует Faro на паузе — ничего не отправляется, например в dev-окружении.
+- Остальные поля — обычный `BrowserConfig` Faro: `app`, `user`, `sessionTracking`, `batching` и т. д. Полей
+  `url` и `apiKey` в типе нет — их заменяет транспорт обёртки. Свои `transports` добавляются к нему.
+- `enabled: false` инициализирует Faro на паузе — удобно для dev-окружения.
 
 > [!IMPORTANT]
-> По умолчанию `instrumentations` — пустой список: Faro сам не собирает ни ошибки, ни Web Vitals, ни сессии,
-> а отправляет только то, что вы передаёте явно. Чтобы получить стандартный набор Faro, передайте
-> `getWebInstrumentations()`, как в примере выше.
+> По умолчанию `instrumentations` — пустой список: Faro не собирает ни ошибки, ни Web Vitals, ни сессии,
+> пока вы не передадите `getWebInstrumentations()`, как в примере выше.
 
-Тела логов для измерений и ошибок пишутся в logfmt, поэтому их можно разбирать в LogQL через `| logfmt`:
-
-```text
-faro_signal=measurement type=custom name=checkout value=1 result=success
-faro_signal=error type=TypeError message="Cannot read properties of undefined"
-```
+Faro регистрируется один раз на страницу, поэтому `destroy()` ставит его на паузу, а следующий `init()`
+снимает паузу с того же инстанса: применяется только новый `beforeSend`, а об изменении `faroUrl`, `faroKey`
+или `app` выводится предупреждение.
 
 ### React Router
 
@@ -122,41 +107,8 @@ faro.init({
 });
 ```
 
-Затем замените `Routes` на `FaroRoutes`. Для других версий роутера подойдут `createReactRouterV4Options`,
-`createReactRouterV5Options`, `createReactRouterV7Options` и data-router варианты из `@grafana/faro-react`.
-
-## Санитизация
-
-Перед отправкой каждый бикон проходит через санитайзеры:
-
-- URL страницы (`meta.page.url`) и все URL в атрибутах событий — ресурсов, нарушений CSP (`documentURI`,
-  `referrer`), навигации (`fromUrl`, `toUrl`) и ваших собственных — сокращаются до хоста и пути в нижнем
-  регистре, а идентификаторы в пути заменяются на `:id`. URL-атрибутом считается строка, начинающаяся
-  с `http://` или `https://`. Идентификаторами считаются UUID любой версии, в том числе с суффиксом,
-  hex-строки от 12 символов и числа от 6 цифр.
-
-  ```text
-  https://shop.example.com/Orders/0190a6e2-7c3b-7d4e-9f00-1a2b3c4d5e6f?token=abc#top
-  → shop.example.com/orders/:id
-  ```
-
-- Метки пользовательских метрик превращаются обратно в объект, чтобы в Grafana они были отдельными атрибутами,
-  а не JSON-строкой.
-
-Свой санитайзер получает копию бикона — `TransportItem` из Faro — и должен вернуть бикон. Санитайзеры
-выполняются по порядку после встроенных:
-
-```typescript
-faro.addSanitizer((beacon) => ({
-  ...beacon,
-  meta: { ...beacon.meta, user: { ...beacon.meta?.user, email: undefined } },
-}));
-```
-
-Санитайзер обязан вернуть бикон. Если он бросает исключение или ничего не возвращает, бикон не отправляется,
-чтобы неочищенные данные не ушли в Grafana, а в консоль один раз выводится предупреждение.
-
-Ваш `beforeSend` вызывается последним и получает уже очищенный бикон. Чтобы отбросить бикон, верните `null`.
+Затем замените `Routes` на `FaroRoutes`. Для других версий роутера в `@grafana/faro-react` есть
+`createReactRouterV4Options`, `createReactRouterV5Options`, `createReactRouterV7Options` и data-router варианты.
 
 ## Пользовательские метрики
 
@@ -164,7 +116,6 @@ faro.addSanitizer((beacon) => ({
 faro.sendMetric({
   name: 'checkout',
   value: 1,
-  description: 'Оформленный заказ',
   unit: 'EVENTS',
   type: 'counter',
   labels: { payment: 'card' },
@@ -178,22 +129,27 @@ faro.sendMetric({
 | `value`       | `number`                                      | Значение; не число (`NaN`) даёт `0`                                                          |
 | `unit`        | `MetricUnit`                                  | `BYTES`, `MILLISECONDS`, `SECONDS`, `REQUESTS`, `ERRORS`, `OPERATIONS`, `EVENTS`, `UNITLESS` |
 | `type`        | `MetricType`                                  | `counter`, `gauge`, `histogram`                                                              |
-| `result`      | `'success' \| 'fail'`                         | Итог, попадает в тело лога, необязательно                                                    |
+| `result`      | `'success' \| 'fail'`                         | Итог, попадает и в тело лога, необязательно                                                  |
 | `labels`      | `Record<string, string \| number \| boolean>` | Плоские метки, типы значений сохраняются, необязательно                                      |
 | `buckets`     | `number[]`                                    | Границы бакетов гистограммы, необязательно                                                   |
 | `description` | `string`                                      | Описание, необязательно                                                                      |
 | `timestamp`   | `number`                                      | Время события в мс, по умолчанию — момент вызова                                             |
 
-Каждый вызов отправляет отдельное измерение, одинаковые метрики подряд не схлопываются. Поля попадают
-в контекст измерения под ключами `measurement.*` — они экспортируются как `MEASUREMENT_KEYS`. Если Faro ещё
-не инициализирован, метрика не отправляется, а в консоль выводится предупреждение.
+Каждый вызов — отдельное измерение Faro с `type: 'custom'` и `values: { [name]: value }`; одинаковые метрики
+подряд не схлопываются. Остальные поля уходят в контекст измерения под ключами `measurement.*` (экспорт
+`MEASUREMENT_KEYS`) и попадают в Grafana атрибутом `faro.measurement.context`. Тело лога — logfmt:
+`faro_signal=measurement type=custom name=checkout value=1 result=success`, его разбирает `| logfmt` в LogQL.
+
+Метки становятся измерениями в Grafana: кладите в них только значения с небольшим числом вариантов.
+Идентификаторы пользователя, сессии, заказа и URL уже есть в `meta` бикона, а как метки они взорвут
+кардинальность.
 
 ## SLO-метрика из нескольких шагов
 
 `trackSlo` измеряет, за сколько страница дошла до состояния, описанного шагами, и отправляет гистограмму
 длительности в миллисекундах. Каждый шаг — предикат, который опрашивается каждые 100 мс, пока не вернёт
-`true`. Когда все шаги прошли — `result: 'success'`; если какой-то шаг не успел к своему дедлайну —
-`result: 'fail'`, и в метках видно, какой именно.
+`true`. Все шаги прошли — `result: 'success'`; какой-то не успел к дедлайну — `result: 'fail'`, и в метках
+видно, какой именно.
 
 ```typescript
 const pageReady = faro.trackSlo({
@@ -221,17 +177,14 @@ pageReady.dispose(); // при уходе со страницы — остано
 | `pauseWhenHidden` | Пауза, пока вкладка скрыта или окно без фокуса; по умолчанию `true`                             |
 | `log`             | Писать ход прогона в консоль                                                                    |
 
-- Проверка шага запускается сразу при старте, а затем каждые 100 мс. Исключение или отклонённый промис —
-  «ещё не готов», повтор на следующем тике. Асинхронная проверка не запускается заново, пока идёт предыдущая.
-- Шаг, не успевший к дедлайну, получает `false` окончательно, но прогон ждёт остальные шаги — до своего
-  `failTime`.
+- Исключение или отклонённый промис в проверке — «ещё не готов», повтор на следующем тике; асинхронная
+  проверка не запускается заново, пока идёт предыдущая.
+- Шаг, не успевший к дедлайну, получает `false` окончательно, но прогон ждёт остальные — до своего `failTime`.
 - Время на паузе не входит ни в длительность, ни в дедлайны.
-- Отправляется одно измерение: `value` — длительность, `unit: 'MILLISECONDS'`, `type: 'histogram'`,
-  `result`, а в `labels` — `status` (то же, что `result`), результат каждого шага (`true`/`false`) и метки из
-  `labels()`.
-- `state` трекера: `waiting` (ждёт `startWhen`), `running`, `paused`, `done`, `disposed`.
-- Без `dispose()` незавершённый прогон опрашивает шаги до `failTime`; при уходе со страницы, например при
-  размонтировании компонента, вызывайте `dispose()` — метрика при этом не отправляется.
+- Уходит одно измерение: `unit: 'MILLISECONDS'`, `type: 'histogram'`, `result`, а в `labels` — `status`
+  (то же, что `result`), результат каждого шага и метки из `labels()`. Имена шагов становятся ключами меток.
+- Трекер сообщает `state` (`waiting`, `running`, `paused`, `done`, `disposed`) и умеет `dispose()`. Без него
+  незавершённый прогон опрашивает шаги до `failTime` — при уходе со страницы вызывайте `dispose()`.
 
 В React прогон живёт в эффекте, а смена состояния страницы — это смена зависимости эффекта:
 
@@ -243,40 +196,10 @@ useEffect(() => {
 }, [isOpen, view]);
 ```
 
-## Формат метрики
-
-И `sendMetric`, и `trackSlo` отправляют измерение Faro с `type: 'custom'` и одним значением
-`values: { [name]: value }`. Остальное уходит в контекст измерения под ключами `measurement.*`
-(экспортируются как `MEASUREMENT_KEYS`) и попадает в Grafana атрибутом `faro.measurement.context`:
-
-| Ключ                      | Откуда                                       |
-| ------------------------- | -------------------------------------------- |
-| `measurement.unit`        | `unit`                                       |
-| `measurement.metric.type` | `type`                                       |
-| `measurement.result`      | `result` — `success` или `fail`              |
-| `measurement.labels`      | `labels` объектом; типы значений сохраняются |
-| `measurement.buckets`     | `buckets` строкой через запятую              |
-| `measurement.description` | `description`, только если задано            |
-
-Тело лога измерения — logfmt: `faro_signal=measurement type=custom name=page_ready value=1234 result=fail`,
-его удобно разбирать в LogQL через `| logfmt`.
-
-Для `trackSlo` формат фиксирован: `value` — длительность в мс без времени на паузе, `unit: 'MILLISECONDS'`,
-`type: 'histogram'`, `result`, а в `labels` — `status` (то же значение, что `result`), каждый шаг со своим
-`true`/`false` и метки из `labels()`.
-
-### Кардинальность
-
-Метки становятся измерениями в Grafana, поэтому в них должны быть только значения с небольшим числом
-вариантов: статус, вид страницы, количество карточек. Идентификаторы пользователя, сессии, заказа или URL
-в метки не кладите — они уже есть в `meta` бикона, а как метки взорвут кардинальность. Имена шагов идут
-ключами меток, поэтому в них лучше не использовать символы, которые потребуют переименования при
-промоушене в stream-labels (например, `:`), если такой промоушен планируется.
-
 ## Проверки вёрстки
 
-Хелперы проверяют DOM и возвращают `boolean` или `Promise<boolean>`, не бросая исключений, поэтому подходят
-и как проверка шага, и как условие готовности:
+Хелперы проверяют DOM, возвращают `boolean` или `Promise<boolean>` и не бросают исключений — их можно
+передавать в шаги напрямую:
 
 ```typescript
 import {
@@ -313,103 +236,79 @@ faro.trackSlo({
 | `extractBackgroundUrl(element)`                               | возвращает URL из `background-image` или `null`                                     |
 | `loadImage(src, timeoutMs?)`                                  | картинка по адресу загрузилась за `timeoutMs`                                       |
 
-- `timeoutMs` по умолчанию — `DEFAULT_IMAGE_TIMEOUT_MS` (10 секунд). Картинка, которая не загрузилась за это
-  время, не прошла проверку.
-- Если элементов по селектору нет, проверки возвращают `false` — шаг просто ждёт следующего тика, пока
-  элементы не появятся.
+- `timeoutMs` по умолчанию — `DEFAULT_IMAGE_TIMEOUT_MS`, 10 секунд. Нет элементов по селектору — `false`.
 - Растровая картинка с нулевой шириной считается сломанной, SVG без собственных размеров — загруженным.
-- «IsDisplayed» значит «загружено», а не «видно на экране»: элемент с `display: none` тоже пройдёт проверку.
-- Из `background-image` берётся первый `url()`: у `image-set(...)` это первый вариант, а не тот, что выбрал
-  браузер. Фон только из градиента и фоны псевдоэлементов `::before`/`::after` не проверяются.
+  «IsDisplayed» значит «загружено», а не «видно на экране».
+- Из `background-image` берётся первый `url()`; фон из одного градиента и фоны `::before`/`::after` не
+  проверяются.
 
-## Остановка и повторный запуск
+## Санитизация
 
-Faro регистрируется один раз на страницу. Поэтому `destroy()` ставит его на паузу и сбрасывает
-пользовательские санитайзеры, а следующий `init()` снимает паузу с того же инстанса. Из новой конфигурации
-применяется только `beforeSend`. Если изменились `faroUrl`, `faroKey` или `app`, в консоль выводится
-предупреждение, а остальные опции остаются от первого `init()`.
+Перед отправкой каждый бикон проходит через встроенные санитайзеры:
+
+- URL страницы (`meta.page.url`) и все `http(s)`-URL в атрибутах событий — ресурсов, нарушений CSP,
+  навигации, ваших собственных — сокращаются до хоста и пути в нижнем регистре, а идентификаторы в пути
+  (UUID любой версии, hex-строки от 12 символов, числа от 6 цифр) заменяются на `:id`:
+  `https://shop.example.com/Orders/0190a6e2-7c3b-7d4e-9f00-1a2b3c4d5e6f?token=abc` → `shop.example.com/orders/:id`.
+- Метки метрик превращаются обратно в объект, чтобы в Grafana они были отдельными атрибутами, а не JSON-строкой.
+
+Свой санитайзер получает копию бикона (`TransportItem` из Faro) и обязан вернуть бикон; санитайзеры
+выполняются по порядку после встроенных. Если санитайзер бросает исключение или ничего не возвращает, бикон
+не отправляется, а в консоль один раз выводится предупреждение. Ваш `beforeSend` вызывается последним и
+получает уже очищенный бикон; чтобы отбросить бикон, верните `null`.
+
+```typescript
+faro.addSanitizer((beacon) => ({
+  ...beacon,
+  meta: { ...beacon.meta, user: { ...beacon.meta?.user, email: undefined } },
+}));
+```
 
 ## API
 
-### `FaroService`
-
-| Член                       | Описание                                                       |
+| `FaroService`              | Описание                                                       |
 | -------------------------- | -------------------------------------------------------------- |
 | `init(config): Faro`       | Инициализирует Faro или снимает его с паузы после `destroy()`  |
+| `destroy()`                | Ставит Faro на паузу и сбрасывает пользовательские санитайзеры |
+| `sendMetric(metric)`       | Отправляет метрику                                             |
+| `trackSlo(config)`         | Запускает SLO-прогон и возвращает `SloTracker`                 |
 | `addSanitizer(fn \| fn[])` | Добавляет санитайзеры после встроенных                         |
 | `getInstance(): Faro`      | Возвращает инстанс Faro; до `init()` бросает ошибку            |
 | `isInitialized`            | `true` между `init()` и `destroy()`                            |
-| `destroy()`                | Ставит Faro на паузу и сбрасывает пользовательские санитайзеры |
-| `sendMetric(metric)`       | Отправляет метрику, поля — см. таблицу выше                    |
-| `trackSlo(config)`         | Запускает SLO-прогон и возвращает `SloTracker`                 |
 
-`config` (тип `FaroServiceConfig`) — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательные
+`config` (тип `FaroServiceConfig`) — `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательные
 `routerAdapter` и `enabled`.
 
-### `SloTracker`
-
-| Член        | Описание                                           |
-| ----------- | -------------------------------------------------- |
-| `state`     | `waiting`, `running`, `paused`, `done`, `disposed` |
-| `dispose()` | Останавливает прогон без отправки метрики          |
-
-### Типы
-
-`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `Metric`, `MetricResult`, `MetricUnit`, `MetricType`, `MetricLabels`,
-`SloConfig`, `SloRunOptions`, `SloTracker`, `SloRunState`, `SloRunResult`, `StepCheck`, `StepConfig`,
-`StepResults`.
-
-Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
+Экспортируемые типы: `FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `Metric`, `MetricResult`, `MetricUnit`,
+`MetricType`, `MetricLabels`, `SloConfig`, `SloRunOptions`, `SloTracker`, `SloRunState`, `SloRunResult`,
+`StepCheck`, `StepConfig`, `StepResults`.
 
 ## Миграция с 0.x
 
-- `MetricsService` удалён: `new MetricsService(faro).sendCustomMetric(m)` → `faro.sendMetric(m)`. Тип
-  `CustomMetric` → `Metric`: `description` необязателен, `status` удалён, `value` — число, `buckets` — числа,
-  метки плоские (`string | number | boolean`), вложенных объектов нет.
-- `MetricsCollector` удалён вместе с `addStep`, условиями готовности, `getStatus()`, `pause()`, `resume()` и
-  `reset()`. Вместо него `faro.trackSlo({ name, failTime, steps })`: шаг — предикат до `true`, пара
-  «проверка + условие готовности» не нужна, отправка встроена, пауза при скрытой вкладке включена по
-  умолчанию, `reset()` → `dispose()`.
-- Типы `MetricFn`, `ReadyToCheckConditionFn`, `MetricsCollectorConfig`, `MetricsCollectorCallback`,
-  `MetricsCollectorStatus` → `StepCheck`, `StepConfig`, `SloConfig`, `SloTracker`, `SloRunResult`.
-- В `FaroServiceConfig` нет `url`, `apiKey` и `paused`; выключение отправки — `enabled: false`.
-- Объекта `renderHelpers` больше нет — хелперы импортируются по именам (`checkRender`, …) или берутся из
-  `GrafanaFaroWrapper.checkRender` в UMD.
-- Первый `url()` из `background-image` и SVG без собственных размеров теперь считаются загруженными (см.
-  «Проверки вёрстки»).
+| Было                                                                        | Стало                                                                                          |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `new MetricsService(faro).sendCustomMetric(m)`                              | `faro.sendMetric(m)`; тип `CustomMetric` → `Metric`, метки плоские, `description` необязателен |
+| `MetricsCollector`, `addStep`, условия готовности, `getStatus()`, `reset()` | `faro.trackSlo({ name, failTime, steps })`, шаг — предикат до `true`, `dispose()`              |
+| `MetricFn`, `ReadyToCheckConditionFn`, `MetricsCollector*`                  | `StepCheck`, `StepConfig`, `SloConfig`, `SloTracker`, `SloRunResult`                           |
+| `paused` в конфигурации                                                     | `enabled: false`; полей `url` и `apiKey` больше нет                                            |
+| объект `renderHelpers`, глобал `FaroReactWrapper`                           | именованные экспорты, глобал `GrafanaFaroWrapper`, один файл `dist/index.umd.full.js`          |
 
-Для страниц без сборщика: глобал `FaroReactWrapper` прежней сборки → `GrafanaFaroWrapper`, один файл
-`dist/index.umd.full.js` вместо бандла с Faro внутри и собственного кода паузы по видимости. Проверьте
-вызовы старого `addMetricStep(name, check, ready)`: лишние аргументы он молча отбрасывал, в `trackSlo` все
-проверки шага объединяются в одном предикате. Условие `if (!params.duration) return` перед отправкой
-отбросит метрики с нулевой длительностью — в `trackSlo` его нет.
+Старый `addMetricStep(name, check, ready)` молча отбрасывал лишние аргументы — при переносе на `trackSlo`
+объедините все проверки шага в одном предикате. Условие `if (!params.duration) return` перед отправкой
+отбросит метрики с нулевой длительностью, в `trackSlo` оно не нужно.
 
 ## Разработка
 
 ```bash
 npm install
-npm run dev              # сборка в watch-режиме
-npm run typecheck
-npm run format           # Prettier; в CI — format:check
-npm test
-npm run build
-npm run verify:package   # точки входа, типы и загрузка UMD
-npm run verify:readme    # примеры README проходят проверку типов; их внешние функции объявлены в скрипте
+npm run dev       # сборка в watch-режиме
+npm run check     # формат, типы, тесты, сборка, проверка пакета и примеров README
 ```
 
-## Релизы
-
-Релиз выпускается по git-тегу `v*`:
-
-```bash
-npm version minor    # или patch / major / prerelease --preid beta
-git push --follow-tags
-```
-
-Воркфлоу `Release` проверяет, что тег совпадает с версией в `package.json`, прогоняет типы, тесты и сборку,
-публикует пакет в npm через Trusted Publishing и создаёт GitHub Release с заметками из коммитов и PR.
-Версии с суффиксом (`1.0.0-beta.1`) публикуются под dist-tag `next` и помечаются как pre-release.
+Релиз — по git-тегу `v*`: `npm version <patch|minor|major>`, затем `git push --follow-tags`. Воркфлоу
+`Release` прогоняет `check`, публикует пакет в npm через Trusted Publishing и создаёт GitHub Release.
+Версии с суффиксом (`1.1.0-beta.1`) уходят под dist-tag `next`.
 
 ## Лицензия
 
-MIT
+MIT © [DmitryK](https://github.com/expatriate)

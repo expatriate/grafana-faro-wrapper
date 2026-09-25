@@ -54,6 +54,7 @@
     "format": "prettier --write src scripts .github *.ts *.json *.md",
     "format:check": "prettier --check src scripts .github *.ts *.json *.md",
     "verify:package": "node scripts/check-package-exports.mjs",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run verify:package",
     "prepublishOnly": "npm run build && npm run verify:package"
   },
   "devDependencies": {

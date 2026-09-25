@@ -89,6 +89,25 @@ describe('MetricsCollector', () => {
     );
   });
 
+  test('a reset right after a finishing resume does not break the next run', async () => {
+    const { collector, onSuccess } = createCollector(['render'], 1000);
+    const render = deferredCheck();
+    collector.addMetricStep('render', render.check);
+    await advance(CHECK_INTERVAL);
+    collector.pause();
+    render.resolve(true);
+    await advance(0);
+
+    collector.resume();
+    collector.reset();
+    collector.addMetricStep('render', () => true);
+    await advance(CHECK_INTERVAL);
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: true } }));
+    expect(collector.getStatus()).toMatchObject({ isRunning: false, isDone: true });
+  });
+
   test('fails with pending steps as false when failTime elapses', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 

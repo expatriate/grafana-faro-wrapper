@@ -259,8 +259,12 @@ export class MetricsCollector<T extends string = string> {
     }
 
     this.isDone = true;
+    const cycle = this.cycle;
 
     queueMicrotask(() => {
+      if (cycle !== this.cycle) {
+        return;
+      }
       this.isRunning = false;
       this.clearTimers();
 

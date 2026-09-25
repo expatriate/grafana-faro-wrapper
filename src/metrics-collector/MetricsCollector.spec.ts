@@ -108,6 +108,27 @@ describe('MetricsCollector', () => {
     expect(collector.getStatus()).toMatchObject({ isRunning: false, isDone: true });
   });
 
+  test('status time stands still while paused and after the run finishes', async () => {
+    const { collector } = createCollector(['render', 'data'], 1000);
+    collector.addMetricStep('render', () => true);
+    await advance(200);
+
+    collector.pause();
+    const paused = collector.getStatus();
+    await advance(500);
+    expect(collector.getStatus()).toMatchObject({
+      runningTime: paused.runningTime,
+      remainingTime: paused.remainingTime,
+    });
+
+    collector.resume();
+    await advance(1000);
+    const finished = collector.getStatus();
+    await advance(500);
+    expect(collector.getStatus().runningTime).toBe(finished.runningTime);
+    expect(finished.runningTime).toBe(1000);
+  });
+
   test('fails with pending steps as false when failTime elapses', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 

@@ -45,6 +45,8 @@ export class MetricsCollector<T extends string = string> {
 
   private startTime?: number;
 
+  private finishTime?: number;
+
   private isRunning = false;
 
   private isDone = false;
@@ -68,6 +70,7 @@ export class MetricsCollector<T extends string = string> {
     this.isPaused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = undefined;
+    this.finishTime = undefined;
 
     this.debug('start');
 
@@ -95,7 +98,7 @@ export class MetricsCollector<T extends string = string> {
 
     this.isPaused = false;
 
-    if (this.pauseStartTime) {
+    if (this.pauseStartTime !== undefined) {
       this.pausedDuration += performance.now() - this.pauseStartTime;
       this.pauseStartTime = undefined;
     }
@@ -149,6 +152,7 @@ export class MetricsCollector<T extends string = string> {
     this.isRunning = false;
     this.isPaused = false;
     this.startTime = undefined;
+    this.finishTime = undefined;
     this.pausedDuration = 0;
     this.pauseStartTime = undefined;
 
@@ -159,7 +163,8 @@ export class MetricsCollector<T extends string = string> {
     if (this.startTime === undefined) {
       return 0;
     }
-    return performance.now() - this.startTime - this.pausedDuration;
+    const end = this.finishTime ?? this.pauseStartTime ?? performance.now();
+    return end - this.startTime - this.pausedDuration;
   }
 
   private scheduleTimers() {
@@ -266,6 +271,7 @@ export class MetricsCollector<T extends string = string> {
         return;
       }
       this.isRunning = false;
+      this.finishTime = performance.now();
       this.clearTimers();
 
       const result: MetricsCollectorCallback = {

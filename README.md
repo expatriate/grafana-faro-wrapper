@@ -9,7 +9,7 @@
 метрики и SLO-метрики из нескольких шагов.
 
 - **`FaroService`** — инициализация Faro с OTLP HTTP-транспортом, санитизация биконов, пауза и повторный запуск.
-- **`MetricsService`** — пользовательские метрики с единицей, типом, метками и результатом.
+- **`sendMetric`** — пользовательские метрики с единицей, типом, метками и результатом.
 - **`MetricsCollector`** — SLO-метрика: ждёт, пока пройдут все шаги, с таймаутом и паузой.
 - **Проверки вёрстки** — готовые проверки для шагов: элементы отрисованы, их достаточно, картинки и фоны
   загрузились.
@@ -66,6 +66,7 @@ faro.init({
 - Остальные поля — обычный `BrowserConfig` Faro: `app`, `user`, `sessionTracking`, `batching` и т. д. Полей `url`
   и `apiKey` в типе нет: их заменяет собственный транспорт обёртки.
 - Свои `transports` добавляются к OTLP-транспорту, а не заменяют его.
+- `enabled: false` инициализирует Faro на паузе — ничего не отправляется, например в dev-окружении.
 
 > [!IMPORTANT]
 > По умолчанию `instrumentations` — пустой список: Faro сам не собирает ни ошибки, ни Web Vitals, ни сессии,
@@ -151,11 +152,7 @@ faro.addSanitizer((beacon) => ({
 ## Пользовательские метрики
 
 ```typescript
-import { MetricsService } from 'grafana-faro-wrapper';
-
-const metrics = new MetricsService(faro);
-
-metrics.sendCustomMetric({
+faro.sendMetric({
   name: 'checkout',
   value: 1,
   description: 'Оформленный заказ',
@@ -166,18 +163,17 @@ metrics.sendCustomMetric({
 });
 ```
 
-| Поле          | Тип                                                | Описание                                                                                     |
-| ------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `name`        | `string`                                           | Имя метрики                                                                                  |
-| `value`       | `number \| string`                                 | Значение; строка приводится к числу, нечисловая даёт `0`                                     |
-| `description` | `string`                                           | Описание                                                                                     |
-| `unit`        | `MetricUnit`                                       | `BYTES`, `MILLISECONDS`, `SECONDS`, `REQUESTS`, `ERRORS`, `OPERATIONS`, `EVENTS`, `UNITLESS` |
-| `type`        | `MetricType`                                       | `counter`, `gauge`, `histogram`                                                              |
-| `labels`      | `Record<string, string \| Record<string, string>>` | Метки, необязательно                                                                         |
-| `status`      | `string`                                           | Статус, необязательно; пустая строка не передаётся                                           |
-| `result`      | `string`                                           | Результат, попадает в тело лога, необязательно; пустая строка не передаётся                  |
-| `buckets`     | `(number \| string)[]`                             | Границы бакетов гистограммы, необязательно                                                   |
-| `timestamp`   | `number`                                           | Время события в мс, по умолчанию — момент вызова                                             |
+| Поле          | Тип                                           | Описание                                                                                     |
+| ------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `name`        | `string`                                      | Имя метрики                                                                                  |
+| `value`       | `number`                                      | Значение; не число (`NaN`) даёт `0`                                                          |
+| `unit`        | `MetricUnit`                                  | `BYTES`, `MILLISECONDS`, `SECONDS`, `REQUESTS`, `ERRORS`, `OPERATIONS`, `EVENTS`, `UNITLESS` |
+| `type`        | `MetricType`                                  | `counter`, `gauge`, `histogram`                                                              |
+| `result`      | `'success' \| 'fail'`                         | Итог, попадает в тело лога, необязательно                                                    |
+| `labels`      | `Record<string, string \| number \| boolean>` | Плоские метки, типы значений сохраняются, необязательно                                      |
+| `buckets`     | `number[]`                                    | Границы бакетов гистограммы, необязательно                                                   |
+| `description` | `string`                                      | Описание, необязательно                                                                      |
+| `timestamp`   | `number`                                      | Время события в мс, по умолчанию — момент вызова                                             |
 
 Каждый вызов отправляет отдельное измерение, одинаковые метрики подряд не схлопываются. Поля попадают
 в контекст измерения под ключами `measurement.*` — они экспортируются как `MEASUREMENT_KEYS`. Если Faro ещё
@@ -196,19 +192,17 @@ const pageReady = new MetricsCollector<'data' | 'render'>({
   steps: ['data', 'render'],
   failTime: 10_000,
   onSuccess: ({ duration }) =>
-    metrics.sendCustomMetric({
+    faro.sendMetric({
       name: 'page_ready',
       value: duration,
-      description: 'Время до готовности страницы',
       unit: 'MILLISECONDS',
       type: 'histogram',
       result: 'success',
     }),
   onFail: ({ duration, steps }) =>
-    metrics.sendCustomMetric({
+    faro.sendMetric({
       name: 'page_ready',
       value: duration,
-      description: 'Время до готовности страницы',
       unit: 'MILLISECONDS',
       type: 'histogram',
       result: 'fail',
@@ -316,16 +310,10 @@ Faro регистрируется один раз на страницу. Поэ�
 | `getInstance(): Faro`      | Возвращает инстанс Faro; до `init()` бросает ошибку            |
 | `isInitialized`            | `true` между `init()` и `destroy()`                            |
 | `destroy()`                | Ставит Faro на паузу и сбрасывает пользовательские санитайзеры |
+| `sendMetric(metric)`       | Отправляет метрику, поля — см. таблицу выше                    |
 
-`config` (тип `FaroServiceConfig`) — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательный
-`routerAdapter`.
-
-### `MetricsService`
-
-| Член                              | Описание                               |
-| --------------------------------- | -------------------------------------- |
-| `new MetricsService(faroService)` | Сервис поверх `FaroService`            |
-| `sendCustomMetric(metric)`        | Отправляет метрику, поля — см. таблицу |
+`config` (тип `FaroServiceConfig`) — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательные
+`routerAdapter` и `enabled`.
 
 ### `MetricsCollector<T>`
 
@@ -340,7 +328,7 @@ Faro регистрируется один раз на страницу. Поэ�
 
 ### Типы
 
-`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetric`, `MetricUnit`, `MetricType`, `MetricLabels`,
+`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `Metric`, `MetricResult`, `MetricUnit`, `MetricType`, `MetricLabels`,
 `MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricsCollectorStatus`,
 `StepCheck`, `StepReadinessCheck`.
 

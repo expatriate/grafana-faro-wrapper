@@ -9,6 +9,8 @@ import {
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
 import { MEASUREMENT_KEYS } from '../measurement/keys.ts';
 import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
+import { sendMeasurement } from '../measurement/sendMeasurement.ts';
+import { Metric } from '../measurement/types.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';
@@ -19,7 +21,10 @@ export interface FaroConfig {
 }
 
 export type FaroServiceConfig = FaroConfig &
-  Omit<BrowserConfig, 'url' | 'apiKey'> & { routerAdapter?: Instrumentation };
+  Omit<BrowserConfig, 'url' | 'apiKey' | 'paused'> & {
+    routerAdapter?: Instrumentation;
+    enabled?: boolean;
+  };
 
 export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
@@ -70,6 +75,7 @@ export class FaroService {
     instrumentations = [],
     beforeSend,
     routerAdapter,
+    enabled = true,
     ...rest
   }: FaroServiceConfig): Faro {
     if (this.state.kind === 'active') {
@@ -98,6 +104,7 @@ export class FaroService {
       ],
 
       instrumentations: [...(routerAdapter ? [routerAdapter] : []), ...instrumentations],
+      paused: !enabled,
 
       beforeSend: (beacon) => {
         const sanitized = this.sanitize(beacon);
@@ -121,6 +128,17 @@ export class FaroService {
   addSanitizer(sanitizer: Sanitizer | Sanitizer[]) {
     const newSanitizers = Array.isArray(sanitizer) ? sanitizer : [sanitizer];
     this.sanitizers = [...this.sanitizers, ...newSanitizers];
+  }
+
+  sendMetric(metric: Metric) {
+    try {
+      sendMeasurement(this.getInstance(), metric);
+    } catch (error) {
+      console.warn(
+        `${LOG_PREFIX} Failed to send metric:`,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
+    }
   }
 
   get isInitialized() {

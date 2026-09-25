@@ -1,4 +1,4 @@
-import { constructMetricContext } from '../metrics-service/helpers/constructMetricContext.ts';
+import { constructMetricContext } from '../measurement/constructMetricContext.ts';
 import { FaroService, FaroServiceConfig } from './FaroService.ts';
 
 jest.mock('@grafana/faro-web-sdk', () => ({
@@ -48,6 +48,26 @@ describe('FaroService', () => {
       apiKey: 'secret-key',
       logsURL: 'https://faro.test/ingest',
     });
+  });
+
+  test('sendMetric warns instead of throwing when Faro is not initialized', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() =>
+      new FaroService().sendMetric({ name: 'm', value: 1, unit: 'EVENTS', type: 'counter' }),
+    ).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to send metric'),
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+  });
+
+  test('enabled: false starts Faro paused', () => {
+    new FaroService().init(config({ enabled: false }));
+
+    expect(initializeFaro).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
   });
 
   test('a second init warns and returns the same Faro instance', () => {
@@ -153,7 +173,7 @@ describe('FaroService', () => {
       return (OtlpHttpTransport as jest.Mock).mock.calls[0][0].otlpTransform;
     }
 
-    test('includes the result of a metric sent through MetricsService', () => {
+    test('includes the result of a metric sent through sendMetric', () => {
       const context = constructMetricContext({
         description: 'checkout completed',
         unit: 'EVENTS',

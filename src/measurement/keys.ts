@@ -3,7 +3,6 @@ export const MEASUREMENT_KEYS = {
   UNIT: 'measurement.unit',
   TYPE: 'measurement.metric.type',
   LABELS: 'measurement.labels',
-  STATUS: 'measurement.status',
   RESULT: 'measurement.result',
   BUCKETS: 'measurement.buckets',
 } as const;

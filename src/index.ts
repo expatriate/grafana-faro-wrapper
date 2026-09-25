@@ -9,7 +9,6 @@ export type {
   MetricsCollectorStatus,
 } from './metrics-collector/MetricsCollector.ts';
 export type * from './metrics-collector/types.ts';
-export { MetricsService } from './metrics-service/MetricsService.ts';
-export type * from './metrics-service/types.ts';
+export type * from './measurement/types.ts';
 export * from './render-helpers/index.ts';
 export * as renderHelpers from './render-helpers/index.ts';

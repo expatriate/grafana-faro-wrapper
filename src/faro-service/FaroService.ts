@@ -90,6 +90,7 @@ export class FaroService {
       beforeSend: (beacon) => {
         const sanitized = this.sanitizers.reduce((item, sanitize) => sanitize(item), {
           ...beacon,
+          meta: structuredClone(beacon.meta),
         } as Record<string, any>) as TransportItem;
 
         return this.userBeforeSend ? this.userBeforeSend(sanitized) : sanitized;

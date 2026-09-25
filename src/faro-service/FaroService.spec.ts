@@ -95,6 +95,21 @@ describe('FaroService', () => {
     expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
   });
 
+  test('a sanitizer changing the beacon in place does not change meta Faro keeps', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    svc.addSanitizer((beacon) => {
+      beacon.meta.user.email = '[hidden]';
+      return beacon;
+    });
+    const storedUser = { email: 'john@example.com' };
+
+    const sent = faro.beforeSend({ type: 'log', meta: { user: storedUser } });
+
+    expect(sent.meta.user.email).toBe('[hidden]');
+    expect(storedUser.email).toBe('john@example.com');
+  });
+
   describe('OTLP log body', () => {
     function initTransforms() {
       new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);

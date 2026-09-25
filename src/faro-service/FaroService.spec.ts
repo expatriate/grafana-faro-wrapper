@@ -110,6 +110,20 @@ describe('FaroService', () => {
     expect(storedUser.email).toBe('john@example.com');
   });
 
+  test('sanitizes beacons in browsers without structuredClone', () => {
+    const { structuredClone } = globalThis;
+    Reflect.deleteProperty(globalThis, 'structuredClone');
+    try {
+      const faro: any = new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);
+
+      const sent = faro.beforeSend({ meta: { page: { url: 'https://a.com/orders/1234567?t=1' } } });
+
+      expect(sent.meta.page.url).toBe('a.com/orders/:id');
+    } finally {
+      globalThis.structuredClone = structuredClone;
+    }
+  });
+
   describe('OTLP log body', () => {
     function initTransforms() {
       new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);

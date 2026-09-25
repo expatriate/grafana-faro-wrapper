@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkRender } from './checkRender.ts';
 
 test('passes only when every selector is in the DOM', () => {

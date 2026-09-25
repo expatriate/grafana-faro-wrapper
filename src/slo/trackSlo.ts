@@ -1,18 +1,14 @@
 import { Metric, MetricLabels, MetricResult } from '../measurement/types.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { SloRun } from './SloRun.ts';
-import { SloRunState, StepConfig } from './types.ts';
+import { SloRunOptions, SloRunState } from './types.ts';
 import { pauseWhileHidden } from './visibility.ts';
 
-export interface SloConfig<S extends string> {
+export interface SloConfig<S extends string> extends SloRunOptions<S> {
   name: string;
-  failTime: number;
-  steps: Record<S, StepConfig>;
   buckets?: number[];
   labels?: () => MetricLabels;
-  startWhen?: () => boolean;
   pauseWhenHidden?: boolean;
-  log?: boolean;
 }
 
 export interface SloTracker {
@@ -35,9 +31,9 @@ export function trackSlo<S extends string>(
 ): SloTracker {
   const run = new SloRun<S>({
     ...runConfig,
-    onFinish: ({ timestamp, duration, steps }) => {
+    onFinish: ({ timestamp, duration, passed, steps }) => {
       unsubscribe();
-      const result: MetricResult = Object.values(steps).every(Boolean) ? 'success' : 'fail';
+      const result: MetricResult = passed ? 'success' : 'fail';
       send({
         name,
         value: duration,
@@ -51,7 +47,6 @@ export function trackSlo<S extends string>(
     },
   });
   const unsubscribe = pauseWhenHidden ? pauseWhileHidden(run) : () => {};
-  run.start();
 
   return {
     get state() {

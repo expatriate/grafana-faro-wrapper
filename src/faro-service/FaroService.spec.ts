@@ -29,8 +29,15 @@ function config(overrides: Partial<FaroServiceConfig> = {}): FaroServiceConfig {
 }
 
 describe('FaroService', () => {
+  let warnSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
   });
 
   test('getInstance throws if not initialized', () => {
@@ -51,8 +58,6 @@ describe('FaroService', () => {
   });
 
   test('sendMetric warns instead of throwing when Faro is not initialized', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
     expect(() =>
       new FaroService().sendMetric({ name: 'm', value: 1, unit: 'EVENTS', type: 'counter' }),
     ).not.toThrow();
@@ -61,7 +66,6 @@ describe('FaroService', () => {
       expect.stringContaining('Failed to send metric'),
       expect.any(String),
     );
-    warnSpy.mockRestore();
   });
 
   test('enabled: false starts Faro paused', () => {
@@ -71,13 +75,11 @@ describe('FaroService', () => {
   });
 
   test('a second init warns and returns the same Faro instance', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
     const instance = svc.init(config());
 
     expect(svc.init(config())).toBe(instance);
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
   });
 
   test('beforeSend wrapper sanitizes the page URL and then calls the user beforeSend', () => {
@@ -119,22 +121,7 @@ describe('FaroService', () => {
     expect(storedUser.email).toBe('john@example.com');
   });
 
-  test('sanitizes beacons in browsers without structuredClone', () => {
-    const { structuredClone } = globalThis;
-    Reflect.deleteProperty(globalThis, 'structuredClone');
-    try {
-      const faro: any = new FaroService().init(config());
-
-      const sent = faro.beforeSend({ meta: { page: { url: 'https://a.com/orders/1234567?t=1' } } });
-
-      expect(sent.meta.page.url).toBe('a.com/orders/:id');
-    } finally {
-      globalThis.structuredClone = structuredClone;
-    }
-  });
-
   test('drops only beacons a sanitizer throws on and warns once', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
     const faro: any = svc.init(config());
     svc.addSanitizer((beacon) => {
@@ -143,19 +130,17 @@ describe('FaroService', () => {
     });
 
     const dropped = [
-      faro.beforeSend({ type: 'exception' }),
-      faro.beforeSend({ type: 'exception' }),
+      faro.beforeSend({ type: 'exception', meta: {} }),
+      faro.beforeSend({ type: 'exception', meta: {} }),
     ];
-    const kept = faro.beforeSend({ type: 'log' });
+    const kept = faro.beforeSend({ type: 'log', meta: {} });
 
     expect(dropped).toEqual([null, null]);
     expect(kept).toMatchObject({ type: 'log' });
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
   });
 
   test('warns when a sanitizer forgets to return the beacon', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
     const faro: any = svc.init(config());
     svc.addSanitizer(((beacon: any) => {
@@ -164,7 +149,6 @@ describe('FaroService', () => {
 
     expect(faro.beforeSend({ type: 'log', meta: { user: { id: '1' } } })).toBeNull();
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
   });
 
   describe('OTLP log body', () => {
@@ -250,7 +234,6 @@ describe('FaroService', () => {
   });
 
   test('init after destroy warns about options Faro cannot change and only about them', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
     svc.init(config({ app: { name: 'shop', version: '1' } }));
 
@@ -261,7 +244,6 @@ describe('FaroService', () => {
     svc.destroy();
     svc.init(config({ faroKey: 'k2', app: { name: 'admin' } }));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('faroKey, app'));
-    warnSpy.mockRestore();
   });
 
   test('destroy keeps default URL sanitization for beacons Faro still produces', () => {

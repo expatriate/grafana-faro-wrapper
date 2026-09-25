@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { SloRun, STEP_CHECK_INTERVAL_MS } from './SloRun.ts';
 import { pauseWhileHidden } from './visibility.ts';
 
@@ -20,7 +19,6 @@ test('time spent in a hidden tab does not count towards the duration', async () 
   let rendered = false;
   const onFinish = jest.fn();
   const run = new SloRun<'render'>({ failTime: 1000, onFinish, steps: { render: () => rendered } });
-  run.start();
   pauseWhileHidden(run);
 
   await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);

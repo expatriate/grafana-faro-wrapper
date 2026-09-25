@@ -7,12 +7,11 @@ import {
   TransportItem,
 } from '@grafana/faro-web-sdk';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
-import { MEASUREMENT_KEYS } from '../measurement/keys.ts';
+import { OTLP_LOG_BODIES } from '../measurement/otlpLogBodies.ts';
 import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 import { sendMeasurement } from '../measurement/sendMeasurement.ts';
 import { Metric } from '../measurement/types.ts';
 import { SloConfig, SloTracker, trackSlo } from '../slo/trackSlo.ts';
-import { toLogfmt } from '../utils/logfmt.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';
 
@@ -29,36 +28,20 @@ export type FaroServiceConfig = FaroConfig &
 
 export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
-type OtlpTransform = NonNullable<
-  ConstructorParameters<typeof OtlpHttpTransport>[0]['otlpTransform']
->;
-
 const DEFAULT_SANITIZERS: Sanitizer[] = [sanitizePageUrl, sanitizeEventUrls, parseMetricLabels];
 
-function measurementValueFields(values: Record<string, number>) {
-  const [first, ...extra] = Object.entries(values);
-  return {
-    name: first?.[0],
-    value: first?.[1],
-    ...Object.fromEntries(extra.map(([key, value]) => [`value_${key}`, value])),
-  };
+type FaroIdentity = Pick<FaroServiceConfig, 'faroUrl' | 'faroKey' | 'app'>;
+
+function warnAboutIgnoredChanges(initial: FaroIdentity, identity: FaroIdentity) {
+  const changed = (Object.keys(identity) as (keyof FaroIdentity)[]).filter(
+    (option) => !deepEqual(identity[option], initial[option]),
+  );
+  if (changed.length > 0) {
+    console.warn(
+      `${LOG_PREFIX} Faro cannot be re-initialized, changed options are ignored: ${changed.join(', ')}`,
+    );
+  }
 }
-
-const OTLP_LOG_BODIES: OtlpTransform = {
-  createMeasurementLogBody({ payload }) {
-    return toLogfmt({
-      faro_signal: 'measurement',
-      type: payload.type,
-      ...measurementValueFields(payload.values),
-      result: payload.context?.[MEASUREMENT_KEYS.RESULT],
-    });
-  },
-  createErrorLogBody({ payload }) {
-    return toLogfmt({ faro_signal: 'error', type: payload.type, message: payload.value });
-  },
-};
-
-type FaroIdentity = Pick<FaroConfig & BrowserConfig, 'faroUrl' | 'faroKey' | 'app'>;
 
 type ServiceState =
   { kind: 'idle' } | { kind: 'active' | 'paused'; faro: Faro; identity: FaroIdentity };
@@ -88,7 +71,7 @@ export class FaroService {
     const identity = { faroUrl, faroKey, app: rest.app };
 
     if (this.state.kind === 'paused') {
-      this.warnAboutIgnoredChanges(this.state.identity, identity);
+      warnAboutIgnoredChanges(this.state.identity, identity);
       this.state.faro.unpause();
       this.state = { ...this.state, kind: 'active' };
       return this.state.faro;
@@ -176,7 +159,7 @@ export class FaroService {
           }
           return sanitized;
         },
-        { ...beacon, meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)) },
+        { ...beacon, meta: JSON.parse(JSON.stringify(beacon.meta)) },
       );
     } catch (error) {
       if (!this.sanitizerFailureReported) {
@@ -184,17 +167,6 @@ export class FaroService {
         console.warn(`${LOG_PREFIX} A sanitizer failed, beacons it fails on are dropped:`, error);
       }
       return null;
-    }
-  }
-
-  private warnAboutIgnoredChanges(initial: FaroIdentity, identity: FaroIdentity) {
-    const changed = (Object.keys(identity) as (keyof FaroIdentity)[]).filter(
-      (option) => !deepEqual(identity[option], initial[option]),
-    );
-    if (changed.length > 0) {
-      console.warn(
-        `${LOG_PREFIX} Faro cannot be re-initialized, changed options are ignored: ${changed.join(', ')}`,
-      );
     }
   }
 }

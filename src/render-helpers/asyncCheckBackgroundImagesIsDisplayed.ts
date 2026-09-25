@@ -1,4 +1,5 @@
 import { extractBackgroundUrl } from './extractBackgroundUrl.ts';
+import { allDisplayed } from './imageRules.ts';
 import { loadImage } from './loadImage.ts';
 import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages.ts';
 
@@ -12,16 +13,11 @@ function isElementImageDisplayed(element: Element, timeoutMs: number): Promise<b
   return url ? loadImage(url, timeoutMs) : Promise.resolve(false);
 }
 
-export async function asyncCheckBackgroundImagesIsDisplayed(
+export function asyncCheckBackgroundImagesIsDisplayed(
   selector: string,
   timeoutMs = DEFAULT_IMAGE_TIMEOUT_MS,
 ): Promise<boolean> {
-  const elements = Array.from(document.querySelectorAll(selector));
-  if (elements.length === 0) {
-    return false;
-  }
-  const results = await Promise.all(
-    elements.map((element) => isElementImageDisplayed(element, timeoutMs)),
+  return allDisplayed(Array.from(document.querySelectorAll(selector)), (element) =>
+    isElementImageDisplayed(element, timeoutMs),
   );
-  return results.every(Boolean);
 }

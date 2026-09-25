@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { stubImageLoading } from './imageStubs.ts';
 import { loadImage } from './loadImage.ts';
 

@@ -8,7 +8,6 @@ function startRun(config: Partial<SloRunConfig<Step>> & Pick<SloRunConfig<Step>,
 } {
   const onFinish = jest.fn();
   const run = new SloRun<Step>({ failTime: 10_000, onFinish, ...config });
-  run.start();
   return { run, onFinish };
 }
 
@@ -44,6 +43,7 @@ test('passes a step once its check turns true and reports the moment it did', as
   expect(onFinish).toHaveBeenCalledWith({
     timestamp: expect.any(Number),
     duration: 3 * STEP_CHECK_INTERVAL_MS,
+    passed: true,
     steps: { render: true, data: true },
   });
 });

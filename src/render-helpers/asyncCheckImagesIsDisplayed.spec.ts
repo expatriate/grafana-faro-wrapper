@@ -1,11 +1,5 @@
-/** @jest-environment jsdom */
 import { asyncCheckImagesIsDisplayed } from './asyncCheckImagesIsDisplayed.ts';
-import { stubDecodedImage } from './imageStubs.ts';
-
-function renderImages(...sources: string[]) {
-  document.body.innerHTML = sources.map((src) => `<img src="${src}">`).join('');
-  return Array.from(document.querySelectorAll('img'));
-}
+import { renderImages, stubDecodedImage } from './imageStubs.ts';
 
 afterEach(() => {
   jest.useRealTimers();

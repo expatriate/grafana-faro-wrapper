@@ -1,3 +1,8 @@
+export function renderImages(...sources: string[]): HTMLImageElement[] {
+  document.body.innerHTML = sources.map((src) => `<img src="${src}">`).join('');
+  return Array.from(document.querySelectorAll('img'));
+}
+
 type ImageOutcome = { naturalWidth: number } | 'error' | 'pending';
 
 export function stubDecodedImage(

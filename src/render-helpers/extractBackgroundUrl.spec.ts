@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { extractBackgroundUrl } from './extractBackgroundUrl.ts';
 
 function backgroundUrlOf(backgroundImage: string) {

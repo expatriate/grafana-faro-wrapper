@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { getAmount } from './getAmount.ts';
 
 test('counts elements matching the selector', () => {

@@ -22,7 +22,7 @@ export function sanitizeUrl(input: string): string {
 }
 
 export function sanitizePageUrl(beacon: TransportItem): TransportItem {
-  const url = beacon.meta?.page?.url;
+  const url = beacon.meta.page?.url;
   if (!url) return beacon;
 
   return {

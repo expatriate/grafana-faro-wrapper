@@ -1,11 +1,5 @@
-/** @jest-environment jsdom */
 import { checkImagesIsDisplayed } from './checkImagesIsDisplayed.ts';
-import { stubDecodedImage } from './imageStubs.ts';
-
-function renderImages(...sources: string[]) {
-  document.body.innerHTML = sources.map((src) => `<img src="${src}">`).join('');
-  return Array.from(document.querySelectorAll('img'));
-}
+import { renderImages, stubDecodedImage } from './imageStubs.ts';
 
 test('passes when every image has loaded pixels', () => {
   const [logo, banner] = renderImages('https://a.com/logo.png', 'https://a.com/banner.png');

@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkRenderInnerValue } from './checkRenderInnerValue.ts';
 
 test('passes only when every element is present and not empty', () => {

@@ -4,8 +4,9 @@ import {
   initializeFaro,
   InternalLoggerLevel,
   TransportItem,
+  TransportItemType,
 } from '@grafana/faro-core';
-import { parseMetricLabels } from './parseMetricLabels.ts';
+import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 
 export function createRealFaro(): { faro: Faro; measurements: () => Record<string, any>[] } {
   const delivered: TransportItem[] = [];
@@ -35,6 +36,8 @@ export function createRealFaro(): { faro: Faro; measurements: () => Record<strin
   return {
     faro,
     measurements: () =>
-      delivered.filter((item) => item.type === 'measurement').map((item) => item.payload),
+      delivered
+        .filter((item) => item.type === TransportItemType.MEASUREMENT)
+        .map((item) => item.payload),
   };
 }

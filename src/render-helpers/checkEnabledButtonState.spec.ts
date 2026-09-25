@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkEnabledButtonState } from './checkEnabledButtonState.ts';
 
 test('passes only for a present button that is neither disabled nor styled as disabled', () => {

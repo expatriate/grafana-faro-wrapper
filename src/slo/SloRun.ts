@@ -1,15 +1,18 @@
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
-import { SloRunResult, SloRunState, StepCheck, StepConfig, StepResults } from './types.ts';
+import {
+  SloRunOptions,
+  SloRunResult,
+  SloRunState,
+  StepCheck,
+  StepConfig,
+  StepResults,
+} from './types.ts';
 
 export const STEP_CHECK_INTERVAL_MS = 100;
 
-export interface SloRunConfig<S extends string> {
-  steps: Record<S, StepConfig>;
-  failTime: number;
-  startWhen?: () => boolean;
+export type SloRunConfig<S extends string> = SloRunOptions<S> & {
   onFinish: (result: SloRunResult<S>) => void;
-  log?: boolean;
-}
+};
 
 interface Step {
   check: StepCheck;
@@ -21,18 +24,16 @@ interface Clock {
   pausedDuration: number;
 }
 
+type Poll = ReturnType<typeof setInterval>;
+
 type State =
-  | { kind: 'idle' }
-  | { kind: 'waiting'; poll: ReturnType<typeof setInterval>; pauseRequested: boolean }
-  | {
-      kind: 'running';
-      clock: Clock;
-      tick: ReturnType<typeof setInterval>;
-      failTimer: ReturnType<typeof setTimeout>;
-    }
+  | { kind: 'waiting'; poll: Poll }
+  | { kind: 'running'; clock: Clock; poll: Poll; failTimer: ReturnType<typeof setTimeout> }
   | { kind: 'paused'; clock: Clock; pausedAt: number }
-  | { kind: 'done'; clock: Clock; finishedAt: number }
+  | { kind: 'done' }
   | { kind: 'disposed' };
+
+const elapsed = (clock: Clock, at: number) => at - clock.startTime - clock.pausedDuration;
 
 export class SloRun<S extends string> {
   private readonly steps: Map<S, Step>;
@@ -43,15 +44,17 @@ export class SloRun<S extends string> {
 
   private readonly failTime: number;
 
-  private readonly startWhen?: () => boolean;
+  private readonly startWhen: () => boolean;
 
   private readonly onFinish: (result: SloRunResult<S>) => void;
 
   private readonly log: boolean;
 
-  private current: State = { kind: 'idle' };
+  private hidden = false;
 
-  constructor({ steps, failTime, startWhen, onFinish, log = false }: SloRunConfig<S>) {
+  private current: State;
+
+  constructor({ steps, failTime, startWhen = () => true, log = false, onFinish }: SloRunConfig<S>) {
     this.failTime = failTime;
     this.startWhen = startWhen;
     this.onFinish = onFinish;
@@ -63,33 +66,19 @@ export class SloRun<S extends string> {
         return [name, { check, deadline: Math.min(stepFailTime ?? failTime, failTime) }];
       }),
     );
+    this.current = {
+      kind: 'waiting',
+      poll: setInterval(() => this.startIfConditionMet(), STEP_CHECK_INTERVAL_MS),
+    };
+    this.startIfConditionMet();
   }
 
   get state(): SloRunState {
-    return this.current.kind === 'idle' ? 'waiting' : this.current.kind;
-  }
-
-  start() {
-    if (this.current.kind !== 'idle') {
-      return;
-    }
-    if (this.startWhen && !this.isStartConditionMet()) {
-      this.current = {
-        kind: 'waiting',
-        poll: setInterval(() => this.startIfConditionMet(), STEP_CHECK_INTERVAL_MS),
-        pauseRequested: false,
-      };
-      this.debug('waiting');
-      return;
-    }
-    this.run({ startTime: performance.now(), pausedDuration: 0 });
+    return this.current.kind;
   }
 
   pause() {
-    if (this.current.kind === 'waiting') {
-      this.current.pauseRequested = true;
-      return;
-    }
+    this.hidden = true;
     if (this.current.kind !== 'running') {
       return;
     }
@@ -99,10 +88,7 @@ export class SloRun<S extends string> {
   }
 
   resume() {
-    if (this.current.kind === 'waiting') {
-      this.current.pauseRequested = false;
-      return;
-    }
+    this.hidden = false;
     if (this.current.kind !== 'paused') {
       return;
     }
@@ -122,7 +108,7 @@ export class SloRun<S extends string> {
 
   private isStartConditionMet() {
     try {
-      return this.startWhen!();
+      return this.startWhen();
     } catch {
       return false;
     }
@@ -132,50 +118,36 @@ export class SloRun<S extends string> {
     if (this.current.kind !== 'waiting' || !this.isStartConditionMet()) {
       return;
     }
-    const { pauseRequested } = this.current;
     this.clearTimers();
     this.run({ startTime: performance.now(), pausedDuration: 0 });
-    if (pauseRequested) {
-      this.pause();
-    }
   }
 
   private run(clock: Clock) {
-    const remaining = this.failTime - (performance.now() - clock.startTime - clock.pausedDuration);
+    const remaining = this.failTime - elapsed(clock, performance.now());
     this.current = {
       kind: 'running',
       clock,
-      tick: setInterval(() => this.checkSteps(), STEP_CHECK_INTERVAL_MS),
+      poll: setInterval(() => this.checkSteps(), STEP_CHECK_INTERVAL_MS),
       failTimer: setTimeout(() => this.finish(), Math.max(0, remaining)),
     };
+    if (this.hidden) {
+      this.pause();
+      return;
+    }
     this.debug('running');
     this.checkSteps();
-  }
-
-  private activeElapsed() {
-    const { current } = this;
-    if (current.kind === 'idle' || current.kind === 'waiting' || current.kind === 'disposed') {
-      return 0;
-    }
-    const end =
-      current.kind === 'paused'
-        ? current.pausedAt
-        : current.kind === 'done'
-          ? current.finishedAt
-          : performance.now();
-    return end - current.clock.startTime - current.clock.pausedDuration;
   }
 
   private checkSteps() {
     if (this.current.kind !== 'running') {
       return;
     }
-    const elapsed = this.activeElapsed();
+    const now = elapsed(this.current.clock, performance.now());
     for (const [name, step] of this.steps) {
       if (this.results.has(name)) {
         continue;
       }
-      if (elapsed >= step.deadline) {
+      if (now >= step.deadline) {
         this.record(name, false);
       } else if (!this.checksInProgress.has(name)) {
         this.runCheck(name, step.check);
@@ -210,11 +182,8 @@ export class SloRun<S extends string> {
   }
 
   private record(name: S, passed: boolean) {
-    if (
-      this.results.has(name) ||
-      this.current.kind === 'disposed' ||
-      this.current.kind === 'done'
-    ) {
+    const accepting = this.current.kind === 'running' || this.current.kind === 'paused';
+    if (!accepting || this.results.has(name)) {
       return;
     }
     this.results.set(name, passed);
@@ -222,8 +191,7 @@ export class SloRun<S extends string> {
   }
 
   private finishIfAllStepsChecked() {
-    const allChecked = Array.from(this.steps.keys()).every((name) => this.results.has(name));
-    if (allChecked) {
+    if (this.results.size === this.steps.size) {
       this.finish();
     }
   }
@@ -232,27 +200,29 @@ export class SloRun<S extends string> {
     if (this.current.kind !== 'running' && this.current.kind !== 'paused') {
       return;
     }
-    const finishedAt = this.current.kind === 'paused' ? this.current.pausedAt : performance.now();
     const { clock } = this.current;
+    const finishedAt = this.current.kind === 'paused' ? this.current.pausedAt : performance.now();
     this.clearTimers();
-    this.current = { kind: 'done', clock, finishedAt };
+    this.current = { kind: 'done' };
 
+    const steps = Object.fromEntries(
+      Array.from(this.steps.keys()).map((name) => [name, this.results.get(name) ?? false]),
+    ) as StepResults<S>;
     const result: SloRunResult<S> = {
       timestamp: Date.now(),
-      duration: Math.round(this.activeElapsed()),
-      steps: Object.fromEntries(
-        Array.from(this.steps.keys()).map((name) => [name, this.results.get(name) ?? false]),
-      ) as StepResults<S>,
+      duration: Math.round(elapsed(clock, finishedAt)),
+      passed: Object.values(steps).every(Boolean),
+      steps,
     };
     this.debug('finish', result.duration, result.steps);
     this.onFinish(result);
   }
 
   private clearTimers() {
-    if (this.current.kind === 'waiting') {
+    if ('poll' in this.current) {
       clearInterval(this.current.poll);
-    } else if (this.current.kind === 'running') {
-      clearInterval(this.current.tick);
+    }
+    if (this.current.kind === 'running') {
       clearTimeout(this.current.failTimer);
     }
   }

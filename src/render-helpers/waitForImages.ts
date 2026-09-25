@@ -1,28 +1,21 @@
-import { isSvgSource } from './isSvgSource.ts';
+import { allDisplayed, hasVisiblePixels, imageSource } from './imageRules.ts';
 import { withTimeout } from './withTimeout.ts';
 
 export const DEFAULT_IMAGE_TIMEOUT_MS = 10_000;
 
 async function waitForImage(image: HTMLImageElement, timeoutMs: number): Promise<boolean> {
-  const src = image.currentSrc || image.src;
+  const src = imageSource(image);
   if (!src) {
     return false;
   }
   try {
     await withTimeout(image.decode(), timeoutMs);
-    return image.naturalWidth > 0 || isSvgSource(src);
+    return hasVisiblePixels(image, src);
   } catch {
     return false;
   }
 }
 
-export async function waitForImages(
-  images: HTMLImageElement[],
-  timeoutMs: number,
-): Promise<boolean> {
-  if (images.length === 0) {
-    return false;
-  }
-  const results = await Promise.all(images.map((image) => waitForImage(image, timeoutMs)));
-  return results.every(Boolean);
+export function waitForImages(images: HTMLImageElement[], timeoutMs: number): Promise<boolean> {
+  return allDisplayed(images, (image) => waitForImage(image, timeoutMs));
 }

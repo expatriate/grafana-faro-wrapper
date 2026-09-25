@@ -1,5 +1,4 @@
-/** @jest-environment jsdom */
-import { createRealFaro } from '../measurement/realFaroFixture.ts';
+import { createRealFaro } from '../testing/realFaro.ts';
 import { sendMeasurement } from '../measurement/sendMeasurement.ts';
 import { STEP_CHECK_INTERVAL_MS } from './SloRun.ts';
 import { SloConfig, trackSlo } from './trackSlo.ts';

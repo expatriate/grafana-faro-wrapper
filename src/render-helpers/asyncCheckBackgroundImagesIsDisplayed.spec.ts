@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { asyncCheckBackgroundImagesIsDisplayed } from './asyncCheckBackgroundImagesIsDisplayed.ts';
 import { stubDecodedImage, stubImageLoading } from './imageStubs.ts';
 

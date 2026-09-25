@@ -356,7 +356,8 @@ Faro регистрируется один раз на страницу. Поэ�
 ### Типы
 
 `FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `Metric`, `MetricResult`, `MetricUnit`, `MetricType`, `MetricLabels`,
-`SloConfig`, `SloTracker`, `SloRunState`, `SloRunResult`, `StepCheck`, `StepConfig`, `StepResults`.
+`SloConfig`, `SloRunOptions`, `SloTracker`, `SloRunState`, `SloRunResult`, `StepCheck`, `StepConfig`,
+`StepResults`.
 
 Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
 

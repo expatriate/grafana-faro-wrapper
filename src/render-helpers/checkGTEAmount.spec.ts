@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkGTEAmount } from './checkGTEAmount.ts';
 
 test('passes when there are at least the given number of elements', () => {

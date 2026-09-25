@@ -1,4 +1,3 @@
-/** @jest-environment jsdom */
 import { checkAmount } from './checkAmount.ts';
 
 test('passes only for the exact number of elements', () => {

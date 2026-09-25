@@ -1,4 +1,4 @@
-import { createRealFaro } from './realFaroFixture.ts';
+import { createRealFaro } from '../testing/realFaro.ts';
 import { sendMeasurement } from './sendMeasurement.ts';
 import { Metric } from './types.ts';
 

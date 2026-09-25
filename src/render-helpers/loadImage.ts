@@ -1,4 +1,4 @@
-import { isSvgSource } from './isSvgSource.ts';
+import { hasVisiblePixels } from './imageRules.ts';
 import { DEFAULT_IMAGE_TIMEOUT_MS } from './waitForImages.ts';
 import { withTimeout } from './withTimeout.ts';
 
@@ -14,7 +14,7 @@ export async function loadImage(
   image.src = src;
   try {
     await withTimeout(loaded, timeoutMs);
-    return image.naturalWidth > 0 || isSvgSource(src);
+    return hasVisiblePixels(image, src);
   } catch {
     return false;
   }

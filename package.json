@@ -58,6 +58,7 @@
     "prepublishOnly": "npm run build && npm run verify:package"
   },
   "devDependencies": {
+    "@grafana/faro-core": "^2.12.1",
     "@grafana/faro-transport-otlp-http": "^2.12.1",
     "@grafana/faro-web-sdk": "^2.12.1",
     "@rollup/plugin-terser": "^1.0.0",

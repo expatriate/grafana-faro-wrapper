@@ -1,5 +1,5 @@
 import { constructMetricContext } from '../metrics-service/helpers/constructMetricContext.ts';
-import { FaroService } from './FaroService.ts';
+import { FaroService, FaroServiceConfig } from './FaroService.ts';
 
 jest.mock('@grafana/faro-web-sdk', () => ({
   ...jest.requireActual('@grafana/faro-web-sdk'),
@@ -24,6 +24,10 @@ jest.mock('@grafana/faro-transport-otlp-http', () => ({
 const { initializeFaro } = jest.requireMock('@grafana/faro-web-sdk');
 const { OtlpHttpTransport } = jest.requireMock('@grafana/faro-transport-otlp-http');
 
+function config(overrides: Partial<FaroServiceConfig> = {}): FaroServiceConfig {
+  return { faroUrl: 'u', faroKey: 'k', app: { name: 'test' }, ...overrides };
+}
+
 describe('FaroService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -34,30 +38,25 @@ describe('FaroService', () => {
     expect(() => svc.getInstance()).toThrow('Faro not initialized. Call init() first.');
   });
 
-  test('init initializes instance, creates OtlpHttpTransport with correct options and is idempotent', () => {
+  test('init sends logs to faroUrl with faroKey through the OTLP transport', () => {
     const svc = new FaroService();
-    const userBeforeSend = jest.fn((b: any) => ({ ...b, userWrapped: true }));
 
-    const config: any = {
-      faroUrl: 'https://faro.test/ingest',
-      faroKey: 'secret-key',
-      beforeSend: userBeforeSend,
-    };
+    svc.init(config({ faroUrl: 'https://faro.test/ingest', faroKey: 'secret-key' }));
 
-    const instance = svc.init(config);
-
-    expect(initializeFaro).toHaveBeenCalled();
     expect(svc.isInitialized).toBe(true);
-    expect(svc.getInstance()).toBeDefined();
+    expect((OtlpHttpTransport as jest.Mock).mock.calls[0][0]).toMatchObject({
+      apiKey: 'secret-key',
+      logsURL: 'https://faro.test/ingest',
+    });
+  });
 
-    const otlpOpts = (OtlpHttpTransport as jest.Mock).mock.calls[0][0];
-    expect(otlpOpts.apiKey).toBe(config.faroKey);
-    expect(otlpOpts.logsURL).toBe(config.faroUrl);
-
+  test('a second init warns and returns the same Faro instance', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const same = svc.init(config);
-    expect(warnSpy).toHaveBeenCalled();
-    expect(same).toBe(instance);
+    const svc = new FaroService();
+    const instance = svc.init(config());
+
+    expect(svc.init(config())).toBe(instance);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
   });
 
@@ -65,15 +64,9 @@ describe('FaroService', () => {
     const svc = new FaroService();
     const userBeforeSend = jest.fn((b: any) => ({ ...b, fromUser: true }));
 
-    svc.init({
-      faroUrl: 'https://x',
-      faroKey: 'k',
-      beforeSend: userBeforeSend,
-    } as any);
+    svc.init(config({ beforeSend: userBeforeSend }));
 
-    const inst: any = svc.getInstance();
-    const wrapper = inst.beforeSend;
-    expect(typeof wrapper).toBe('function');
+    const wrapper = (svc.getInstance() as any).beforeSend;
 
     const beacon = {
       meta: { page: { url: 'https://example.com/path?accessToken=abc&other=1' } },
@@ -86,18 +79,14 @@ describe('FaroService', () => {
   });
 
   test('a user beforeSend returning null drops the beacon', () => {
-    const faro: any = new FaroService().init({
-      faroUrl: 'u',
-      faroKey: 'k',
-      beforeSend: () => null,
-    } as any);
+    const faro: any = new FaroService().init(config({ beforeSend: () => null }));
 
     expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
   });
 
   test('a sanitizer changing the beacon in place does not change meta Faro keeps', () => {
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const faro: any = svc.init(config());
     svc.addSanitizer((beacon) => {
       beacon.meta.user!.email = '[hidden]';
       return beacon;
@@ -114,7 +103,7 @@ describe('FaroService', () => {
     const { structuredClone } = globalThis;
     Reflect.deleteProperty(globalThis, 'structuredClone');
     try {
-      const faro: any = new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);
+      const faro: any = new FaroService().init(config());
 
       const sent = faro.beforeSend({ meta: { page: { url: 'https://a.com/orders/1234567?t=1' } } });
 
@@ -127,7 +116,7 @@ describe('FaroService', () => {
   test('drops only beacons a sanitizer throws on and warns once', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const faro: any = svc.init(config());
     svc.addSanitizer((beacon) => {
       if (beacon.type === 'exception') throw new Error('boom');
       return beacon;
@@ -148,7 +137,7 @@ describe('FaroService', () => {
   test('warns when a sanitizer forgets to return the beacon', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const faro: any = svc.init(config());
     svc.addSanitizer(((beacon: any) => {
       beacon.meta.user = undefined;
     }) as any);
@@ -160,7 +149,7 @@ describe('FaroService', () => {
 
   describe('OTLP log body', () => {
     function initTransforms() {
-      new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);
+      new FaroService().init(config());
       return (OtlpHttpTransport as jest.Mock).mock.calls[0][0].otlpTransform;
     }
 
@@ -210,7 +199,7 @@ describe('FaroService', () => {
 
   test('destroy leaves the service uninitialized', () => {
     const svc = new FaroService();
-    svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    svc.init(config());
     expect(svc.isInitialized).toBe(true);
     svc.destroy();
     expect(svc.isInitialized).toBe(false);
@@ -219,12 +208,12 @@ describe('FaroService', () => {
 
   test('destroy stops sending and init resumes the same Faro instance', () => {
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const faro: any = svc.init(config());
 
     svc.destroy();
     expect(faro.paused).toBe(true);
 
-    const resumed = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const resumed = svc.init(config());
     expect(resumed).toBe(faro);
     expect(faro.paused).toBe(false);
     expect(svc.getInstance()).toBe(faro);
@@ -232,10 +221,10 @@ describe('FaroService', () => {
 
   test('init after destroy applies the new beforeSend', () => {
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k', beforeSend: (b: any) => b } as any);
+    const faro: any = svc.init(config({ beforeSend: (beacon) => beacon }));
     svc.destroy();
 
-    svc.init({ faroUrl: 'u', faroKey: 'k', beforeSend: () => null } as any);
+    svc.init(config({ beforeSend: () => null }));
 
     expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
   });
@@ -243,21 +232,21 @@ describe('FaroService', () => {
   test('init after destroy warns about options Faro cannot change and only about them', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
-    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop', version: '1' } } as any);
+    svc.init(config({ app: { name: 'shop', version: '1' } }));
 
     svc.destroy();
-    svc.init({ faroUrl: 'u', faroKey: 'k', app: { version: '1', name: 'shop' } } as any);
+    svc.init(config({ app: { version: '1', name: 'shop' } }));
     expect(warnSpy).not.toHaveBeenCalled();
 
     svc.destroy();
-    svc.init({ faroUrl: 'u', faroKey: 'k2', app: { name: 'admin' } } as any);
+    svc.init(config({ faroKey: 'k2', app: { name: 'admin' } }));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('faroKey, app'));
     warnSpy.mockRestore();
   });
 
   test('destroy keeps default URL sanitization for beacons Faro still produces', () => {
     const svc = new FaroService();
-    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    const faro: any = svc.init(config());
 
     svc.destroy();
     const beacon = faro.beforeSend({
@@ -271,7 +260,7 @@ describe('FaroService', () => {
     initializeFaro.mockReturnValueOnce(undefined);
     const svc = new FaroService();
 
-    expect(() => svc.init({ faroUrl: 'u', faroKey: 'k' } as any)).toThrow(/already registered/);
+    expect(() => svc.init(config())).toThrow(/already registered/);
     expect(svc.isInitialized).toBe(false);
   });
 });

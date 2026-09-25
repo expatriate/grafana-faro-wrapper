@@ -6,6 +6,7 @@ export type {
   MetricsCollectorCallback,
   MetricsCollectorConfig,
   MetricsCollectorState,
+  MetricsCollectorStatus,
 } from './metrics-collector/MetricsCollector.ts';
 export type * from './metrics-collector/types.ts';
 export { MetricsService } from './metrics-service/MetricsService.ts';

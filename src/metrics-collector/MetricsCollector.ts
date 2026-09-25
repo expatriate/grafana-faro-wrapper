@@ -1,7 +1,7 @@
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
-import { MetricFn, ReadyToCheckConditionFn } from './types.ts';
+import { StepCheck, StepReadinessCheck } from './types.ts';
 
-const STEP_CHECK_INTERVAL_MS = 100;
+export const STEP_CHECK_INTERVAL_MS = 100;
 
 export type MetricsCollectorState = 'idle' | 'running' | 'paused' | 'finishing' | 'done';
 
@@ -32,6 +32,25 @@ export interface MetricsCollectorConfig<T extends string = string> {
   onFail: (params: MetricsCollectorCallback<T>) => void;
 }
 
+export interface MetricsCollectorStatus<T extends string = string> {
+  state: MetricsCollectorState;
+  isRunning: boolean;
+  isDone: boolean;
+  isPaused: boolean;
+  runningTime: number;
+  pausedDuration: number;
+  remainingTime: number | undefined;
+  registeredSteps: T[];
+  completedSteps: [T, boolean][];
+  pendingSteps: T[];
+  /** @deprecated Use registeredSteps. */
+  registeredMetrics: T[];
+  /** @deprecated Use completedSteps. */
+  completedMetrics: [T, boolean][];
+  /** @deprecated Use pendingSteps. */
+  pendingMetrics: T[];
+}
+
 export interface MetricsCollectorCallback<T extends string = string> {
   timestamp: number;
   duration: number;
@@ -39,7 +58,7 @@ export interface MetricsCollectorCallback<T extends string = string> {
 }
 
 export class MetricsCollector<T extends string = string> {
-  private stepChecks = new Map<T, { fn: MetricFn; conditionFn?: ReadyToCheckConditionFn }>();
+  private stepChecks = new Map<T, { fn: StepCheck; conditionFn?: StepReadinessCheck }>();
 
   private stepResults = new Map<T, boolean>();
 
@@ -67,30 +86,32 @@ export class MetricsCollector<T extends string = string> {
     this.log = log;
   }
 
-  start() {
+  start(): this {
     if (this.state.kind !== 'idle') {
-      return;
+      return this;
     }
 
     this.debug('start');
     this.run({ startTime: performance.now(), pausedDuration: 0 });
     this.scheduleFailTimer();
+    return this;
   }
 
-  pause() {
+  pause(): this {
     if (this.state.kind !== 'running') {
-      return;
+      return this;
     }
 
     this.clearTimers();
     this.state = { kind: 'paused', clock: this.state.clock, pausedAt: performance.now() };
 
     this.debug('pause');
+    return this;
   }
 
-  resume() {
+  resume(): this {
     if (this.state.kind !== 'paused') {
-      return;
+      return this;
     }
 
     const { clock, pausedAt } = this.state;
@@ -100,11 +121,15 @@ export class MetricsCollector<T extends string = string> {
     this.finishIfAllStepsChecked();
     this.checkSteps();
     this.scheduleFailTimer();
+    return this;
   }
 
-  getStatus() {
+  getStatus(): MetricsCollectorStatus<T> {
     const { kind } = this.state;
     const runningTime = this.activeElapsed();
+    const registeredSteps = Array.from(this.stepChecks.keys());
+    const completedSteps = Array.from(this.stepResults.entries());
+    const pendingSteps = this.steps.filter((step) => !this.stepResults.has(step));
     return {
       state: kind,
       isRunning: kind === 'running' || kind === 'paused' || kind === 'finishing',
@@ -112,15 +137,18 @@ export class MetricsCollector<T extends string = string> {
       isPaused: kind === 'paused',
       runningTime,
       pausedDuration: kind === 'idle' ? 0 : this.state.clock.pausedDuration,
-      registeredMetrics: Array.from(this.stepChecks.keys()),
-      completedMetrics: Array.from(this.stepResults.entries()),
-      pendingMetrics: this.steps.filter((step) => !this.stepResults.has(step)),
       remainingTime:
         this.failTime && kind !== 'idle' ? Math.max(0, this.failTime - runningTime) : undefined,
+      registeredSteps,
+      completedSteps,
+      pendingSteps,
+      registeredMetrics: registeredSteps,
+      completedMetrics: completedSteps,
+      pendingMetrics: pendingSteps,
     };
   }
 
-  addMetricStep(key: T, fn: MetricFn, conditionFn?: ReadyToCheckConditionFn): this {
+  addStep(key: T, fn: StepCheck, conditionFn?: StepReadinessCheck): this {
     if (this.isFinished() || !this.steps.includes(key) || this.stepChecks.has(key)) {
       return this;
     }
@@ -128,13 +156,18 @@ export class MetricsCollector<T extends string = string> {
     this.start();
     this.stepChecks.set(key, { fn, conditionFn });
 
-    this.debug('addMetricStep', key);
+    this.debug('addStep', key);
     this.checkSteps();
 
     return this;
   }
 
-  reset() {
+  /** @deprecated Use addStep. */
+  addMetricStep(key: T, fn: StepCheck, conditionFn?: StepReadinessCheck): this {
+    return this.addStep(key, fn, conditionFn);
+  }
+
+  reset(): this {
     this.clearTimers();
 
     this.cycle++;
@@ -144,6 +177,7 @@ export class MetricsCollector<T extends string = string> {
     this.checksInProgress.clear();
 
     this.debug('reset');
+    return this;
   }
 
   private isFinished() {
@@ -226,9 +260,9 @@ export class MetricsCollector<T extends string = string> {
 
   private checkIfReady(
     key: T,
-    fn: MetricFn,
-    conditionFn?: ReadyToCheckConditionFn,
-  ): MetricFn | undefined {
+    fn: StepCheck,
+    conditionFn?: StepReadinessCheck,
+  ): StepCheck | undefined {
     try {
       return !conditionFn || conditionFn() ? fn : undefined;
     } catch {
@@ -237,7 +271,7 @@ export class MetricsCollector<T extends string = string> {
     }
   }
 
-  private async runCheck(key: T, fn: MetricFn): Promise<boolean> {
+  private async runCheck(key: T, fn: StepCheck): Promise<boolean> {
     try {
       const value = await fn();
       this.debug('checkSteps:result', key, value);

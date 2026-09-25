@@ -6,9 +6,9 @@ import {
 } from '@grafana/faro-core';
 import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 import { MetricsService } from './MetricsService.ts';
-import { CustomMetricBase } from './types.ts';
+import { CustomMetric } from './types.ts';
 
-function sendThroughRealFaro(...metrics: CustomMetricBase[]): TransportItem[] {
+function sendThroughRealFaro(...metrics: CustomMetric[]): TransportItem[] {
   const delivered: TransportItem[] = [];
   class CollectingTransport extends BaseTransport {
     readonly name = 'collecting';
@@ -39,7 +39,7 @@ function sendThroughRealFaro(...metrics: CustomMetricBase[]): TransportItem[] {
   return delivered.filter((item) => item.type === 'measurement');
 }
 
-const click: CustomMetricBase = {
+const click: CustomMetric = {
   name: 'user_action',
   value: 1,
   description: 'button click',

@@ -1,6 +1,4 @@
-import { MetricsCollector } from './MetricsCollector.ts';
-
-const CHECK_INTERVAL = 100;
+import { MetricsCollector, STEP_CHECK_INTERVAL_MS } from './MetricsCollector.ts';
 
 type Step = 'render' | 'data';
 
@@ -31,8 +29,8 @@ describe('MetricsCollector', () => {
   test('checks steps as soon as they are registered, without waiting for an interval', async () => {
     const { collector, onSuccess, onFail } = createCollector();
 
-    collector.addMetricStep('render', () => true);
-    collector.addMetricStep('data', async () => true);
+    collector.addStep('render', () => true);
+    collector.addStep('data', async () => true);
     await advance(0);
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
@@ -47,9 +45,9 @@ describe('MetricsCollector', () => {
   test('reports failure when a check returns false', async () => {
     const { collector, onSuccess, onFail } = createCollector();
 
-    collector.addMetricStep('render', () => true);
-    collector.addMetricStep('data', () => false);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', () => true);
+    collector.addStep('data', () => false);
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onFail).toHaveBeenCalledWith(
       expect.objectContaining({ steps: { render: true, data: false } }),
@@ -60,11 +58,11 @@ describe('MetricsCollector', () => {
   test('treats throwing and rejecting checks as failed steps', async () => {
     const { collector, onFail } = createCollector();
 
-    collector.addMetricStep('render', () => {
+    collector.addStep('render', () => {
       throw new Error('boom');
     });
-    collector.addMetricStep('data', () => Promise.reject(new Error('boom')));
-    await advance(CHECK_INTERVAL);
+    collector.addStep('data', () => Promise.reject(new Error('boom')));
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onFail).toHaveBeenCalledWith(
       expect.objectContaining({ steps: { render: false, data: false } }),
@@ -74,15 +72,15 @@ describe('MetricsCollector', () => {
   test('treats a throwing readiness condition as a failed step', async () => {
     const { collector, onFail } = createCollector();
 
-    collector.addMetricStep('render', () => true);
-    collector.addMetricStep(
+    collector.addStep('render', () => true);
+    collector.addStep(
       'data',
       () => true,
       () => {
         throw new Error('boom');
       },
     );
-    await advance(CHECK_INTERVAL);
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onFail).toHaveBeenCalledWith(
       expect.objectContaining({ steps: { render: true, data: false } }),
@@ -92,16 +90,16 @@ describe('MetricsCollector', () => {
   test('a reset right after a finishing resume does not break the next run', async () => {
     const { collector, onSuccess } = createCollector(['render'], 1000);
     const render = deferredCheck();
-    collector.addMetricStep('render', render.check);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', render.check);
+    await advance(STEP_CHECK_INTERVAL_MS);
     collector.pause();
     render.resolve(true);
     await advance(0);
 
     collector.resume();
     collector.reset();
-    collector.addMetricStep('render', () => true);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', () => true);
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: true } }));
@@ -110,7 +108,7 @@ describe('MetricsCollector', () => {
 
   test('status time stands still while paused and after the run finishes', async () => {
     const { collector } = createCollector(['render', 'data'], 1000);
-    collector.addMetricStep('render', () => true);
+    collector.addStep('render', () => true);
     await advance(200);
 
     collector.pause();
@@ -134,7 +132,7 @@ describe('MetricsCollector', () => {
     const render = deferredCheck();
     const states = [collector.getStatus().state];
 
-    collector.addMetricStep('render', render.check);
+    collector.addStep('render', render.check);
     states.push(collector.getStatus().state);
     collector.pause();
     states.push(collector.getStatus().state);
@@ -151,7 +149,7 @@ describe('MetricsCollector', () => {
   test('fails with pending steps as false when failTime elapses', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 
-    collector.addMetricStep('render', () => true);
+    collector.addStep('render', () => true);
     await advance(1000);
 
     expect(onFail).toHaveBeenCalledWith(
@@ -163,23 +161,23 @@ describe('MetricsCollector', () => {
     const { collector, onSuccess } = createCollector(['render']);
     let ready = false;
 
-    collector.addMetricStep(
+    collector.addStep(
       'render',
       () => true,
       () => ready,
     );
-    await advance(CHECK_INTERVAL * 5);
+    await advance(STEP_CHECK_INTERVAL_MS * 5);
     expect(onSuccess).not.toHaveBeenCalled();
 
     ready = true;
-    await advance(CHECK_INTERVAL);
+    await advance(STEP_CHECK_INTERVAL_MS);
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: true } }));
   });
 
   test('reports a single outcome when failTime elapses after success', async () => {
     const { collector, onSuccess, onFail } = createCollector(['render'], 1000);
 
-    collector.addMetricStep('render', () => true);
+    collector.addStep('render', () => true);
     await advance(2000);
 
     expect(onSuccess).toHaveBeenCalledTimes(1);
@@ -189,7 +187,7 @@ describe('MetricsCollector', () => {
   test('pause stops the failTime clock and is excluded from duration', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 
-    collector.addMetricStep('render', () => true);
+    collector.addStep('render', () => true);
     await advance(500);
     collector.pause();
     await advance(5000);
@@ -205,13 +203,13 @@ describe('MetricsCollector', () => {
     const { collector, onSuccess } = createCollector(['render']);
     const render = deferredCheck();
 
-    collector.addMetricStep('render', render.check);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', render.check);
+    await advance(STEP_CHECK_INTERVAL_MS);
     collector.pause();
     render.resolve(true);
     await advance(0);
     collector.resume();
-    await advance(CHECK_INTERVAL);
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: true } }));
   });
@@ -220,15 +218,15 @@ describe('MetricsCollector', () => {
     const { collector, onSuccess, onFail } = createCollector(['render']);
     const staleRender = deferredCheck();
 
-    collector.addMetricStep('render', staleRender.check);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', staleRender.check);
+    await advance(STEP_CHECK_INTERVAL_MS);
     collector.reset();
     staleRender.resolve(true);
     await advance(0);
     expect(onSuccess).not.toHaveBeenCalled();
 
-    collector.addMetricStep('render', () => false);
-    await advance(CHECK_INTERVAL);
+    collector.addStep('render', () => false);
+    await advance(STEP_CHECK_INTERVAL_MS);
 
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onFail).toHaveBeenCalledWith(expect.objectContaining({ steps: { render: false } }));
@@ -238,8 +236,8 @@ describe('MetricsCollector', () => {
     const { collector } = createCollector(['render']);
     const slowCheck = jest.fn(() => new Promise<boolean>(() => {}));
 
-    collector.addMetricStep('render', slowCheck);
-    await advance(CHECK_INTERVAL * 10);
+    collector.addStep('render', slowCheck);
+    await advance(STEP_CHECK_INTERVAL_MS * 10);
 
     expect(slowCheck).toHaveBeenCalledTimes(1);
   });

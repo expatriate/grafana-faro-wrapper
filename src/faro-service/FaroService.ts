@@ -29,16 +29,21 @@ type OtlpTransform = NonNullable<
 
 const DEFAULT_SANITIZERS: Sanitizer[] = [sanitizePageUrl, sanitizeEventUrls, parseMetricLabels];
 
+function measurementValueFields(values: Record<string, number>) {
+  const [first, ...extra] = Object.entries(values);
+  return {
+    name: first?.[0],
+    value: first?.[1],
+    ...Object.fromEntries(extra.map(([key, value]) => [`value_${key}`, value])),
+  };
+}
+
 const OTLP_LOG_BODIES: OtlpTransform = {
   createMeasurementLogBody({ payload }) {
-    const [[name, value] = [], ...extraValues] = Object.entries(payload.values);
-
     return toLogfmt({
       faro_signal: 'measurement',
       type: payload.type,
-      name,
-      value,
-      ...Object.fromEntries(extraValues.map(([key, extra]) => [`value_${key}`, extra])),
+      ...measurementValueFields(payload.values),
       result: payload.context?.[MEASUREMENT_KEYS.RESULT],
     });
   },

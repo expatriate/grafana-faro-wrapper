@@ -172,8 +172,8 @@ metrics.sendCustomMetric({
 | `unit`        | `MetricUnit`                                       | `BYTES`, `MILLISECONDS`, `SECONDS`, `REQUESTS`, `ERRORS`, `OPERATIONS`, `EVENTS`, `UNITLESS` |
 | `type`        | `MetricType`                                       | `counter`, `gauge`, `histogram`                                                              |
 | `labels`      | `Record<string, string \| Record<string, string>>` | Метки, необязательно                                                                         |
-| `status`      | `string`                                           | Статус, необязательно                                                                        |
-| `result`      | `string`                                           | Результат, попадает в тело лога, необязательно                                               |
+| `status`      | `string`                                           | Статус, необязательно; пустая строка не передаётся                                           |
+| `result`      | `string`                                           | Результат, попадает в тело лога, необязательно; пустая строка не передаётся                  |
 | `buckets`     | `(number \| string)[]`                             | Границы бакетов гистограммы, необязательно                                                   |
 | `timestamp`   | `number`                                           | Время события в мс, по умолчанию — момент вызова                                             |
 
@@ -219,15 +219,15 @@ const pageReady = new MetricsCollector<'data' | 'render'>({
     }),
 });
 
-pageReady.addMetricStep('data', async () => (await fetchData()).ok);
-pageReady.addMetricStep(
+pageReady.addStep('data', async () => (await fetchData()).ok);
+pageReady.addStep(
   'render',
   () => true,
   () => isRendered(),
 );
 ```
 
-- Первый `addMetricStep` запускает отсчёт. Шаги не из `steps` и повторная регистрация шага игнорируются.
+- Первый `addStep` запускает отсчёт. `failTime`, равный `0` или не заданный, означает «без таймаута». Шаги не из `steps` и повторная регистрация шага игнорируются.
 - Проверка шага запускается сразу при регистрации, а затем каждые 100 мс, пока не вернёт результат. Исключение или отклонённый промис
   считаются провалом.
 - Третий аргумент — условие готовности: пока оно возвращает `false`, проверка не запускается. Если условие
@@ -237,9 +237,11 @@ pageReady.addMetricStep(
   сборщик опрашивает незавершённые шаги до конца жизни страницы, поэтому при уходе со страницы, например
   при размонтировании компонента, вызывайте `reset()`.
 - `getStatus()` возвращает `state` — `idle`, `running`, `paused`, `finishing` (итог определён, колбэк ещё
-  не вызван) или `done`, — а также `runningTime`, `pausedDuration`, `remainingTime` и списки `registeredMetrics`,
-  `completedMetrics`, `pendingMetrics`. Флаги `isRunning`, `isPaused` и `isDone` оставлены для совместимости:
+  не вызван) или `done`, — а также `runningTime`, `pausedDuration`, `remainingTime` и списки `registeredSteps`,
+  `completedSteps`, `pendingSteps`. Флаги `isRunning`, `isPaused` и `isDone` оставлены для совместимости:
   `isRunning` истинен в `running`, `paused` и `finishing`, `isDone` — в `finishing` и `done`.
+- `start()`, `pause()`, `resume()`, `reset()` и `addStep()` возвращают сам сборщик, вызовы можно объединять
+  в цепочку.
 - `log: true` пишет ход сбора в консоль.
 
 ## Остановка и повторный запуск
@@ -276,7 +278,7 @@ Faro регистрируется один раз на страницу. Поэ�
 | Член                                                                  | Описание                                      |
 | --------------------------------------------------------------------- | --------------------------------------------- |
 | `new MetricsCollector({ steps, failTime?, onSuccess, onFail, log? })` | Сборщик для шагов `T`                         |
-| `addMetricStep(step, check, isReady?)`                                | Регистрирует проверку шага и запускает отсчёт |
+| `addStep(step, check, isReady?)`                                      | Регистрирует проверку шага и запускает отсчёт |
 | `start()`, `pause()`, `resume()`, `reset()`                           | Управление отсчётом                           |
 | `getStatus()`                                                         | Текущее состояние                             |
 
@@ -284,8 +286,27 @@ Faro регистрируется один раз на страницу. Поэ�
 
 ### Типы
 
-`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetricBase`, `MetricUnit`, `MetricType`, `MetricLabel`,
-`MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricFn`, `ReadyToCheckConditionFn`.
+`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetric`, `MetricUnit`, `MetricType`, `MetricLabels`,
+`MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricsCollectorStatus`,
+`StepCheck`, `StepReadinessCheck`.
+
+## Миграция с 0.3
+
+- `Sanitizer` принимает и возвращает `TransportItem` из Faro. Санитайзер, объявленный с типом
+  `Record<string, any>`, перестанет проходить проверку типов — уберите аннотацию или используйте `TransportItem`.
+- В `FaroServiceConfig` больше нет полей `url` и `apiKey`: они и раньше не работали вместе с транспортом обёртки.
+- Шаг `MetricsCollector` проверяется сразу при регистрации, поэтому длительности SLO-метрик станут короче —
+  до 100 мс.
+- Переименования; старые имена работают, но помечены как устаревшие и будут удалены в 1.0:
+
+  | Было                                                      | Стало                                               |
+  | --------------------------------------------------------- | --------------------------------------------------- |
+  | `addMetricStep`                                           | `addStep`                                           |
+  | `registeredMetrics`, `completedMetrics`, `pendingMetrics` | `registeredSteps`, `completedSteps`, `pendingSteps` |
+  | `MetricFn`, `ReadyToCheckConditionFn`                     | `StepCheck`, `StepReadinessCheck`                   |
+  | `CustomMetricBase`, `MetricLabel`                         | `CustomMetric`, `MetricLabels`                      |
+
+- `getStatus()` возвращает поле `state`, а `start()`, `pause()`, `resume()` и `reset()` — сам сборщик.
 
 ## Миграция с 0.2
 

@@ -1,5 +1,5 @@
 import { MEASUREMENT_KEYS } from '../../measurement/keys.ts';
-import { CustomMetricBase } from '../types.ts';
+import { CustomMetric } from '../types.ts';
 
 export function constructMetricContext({
   description,
@@ -9,7 +9,7 @@ export function constructMetricContext({
   type,
   labels,
   buckets,
-}: Omit<CustomMetricBase, 'timestamp' | 'name' | 'value'>): Record<string, any> {
+}: Omit<CustomMetric, 'timestamp' | 'name' | 'value'>): Record<string, any> {
   return {
     [MEASUREMENT_KEYS.DESCRIPTION]: description,
     [MEASUREMENT_KEYS.UNIT]: unit,
@@ -17,6 +17,6 @@ export function constructMetricContext({
     ...(labels && { [MEASUREMENT_KEYS.LABELS]: labels }),
     ...(status && { [MEASUREMENT_KEYS.STATUS]: status }),
     ...(result && { [MEASUREMENT_KEYS.RESULT]: result }),
-    ...(buckets && { [MEASUREMENT_KEYS.BUCKETS]: buckets.toString() }),
+    ...(buckets && { [MEASUREMENT_KEYS.BUCKETS]: buckets.join(',') }),
   };
 }

@@ -1,10 +1,10 @@
-export type CustomMetricBase = {
+export type CustomMetric = {
   timestamp?: number;
   name: string;
   value: string | number;
   description: string;
   unit: MetricUnit;
-  labels?: MetricLabel;
+  labels?: MetricLabels;
   type: MetricType;
   status?: string;
   result?: string;
@@ -21,6 +21,11 @@ export type MetricUnit =
   | 'EVENTS'
   | 'UNITLESS';
 
-export type MetricLabel = Record<string, string | Record<string, string>>;
+export type MetricLabels = Record<string, string | Record<string, string>>;
 
 export type MetricType = 'histogram' | 'counter' | 'gauge';
+
+/** @deprecated Use CustomMetric. */
+export type CustomMetricBase = CustomMetric;
+/** @deprecated Use MetricLabels. */
+export type MetricLabel = MetricLabels;

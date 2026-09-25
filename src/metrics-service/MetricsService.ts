@@ -1,21 +1,21 @@
 import { FaroService } from '../faro-service/FaroService.ts';
 import { CUSTOM_MEASUREMENT_TYPE } from '../measurement/keys.ts';
-import { safeNumberConversion } from '../utils/helpers.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { constructMetricContext } from './helpers/constructMetricContext.ts';
-import { CustomMetricBase } from './types.ts';
+import { toMetricValue } from './helpers/toMetricValue.ts';
+import { CustomMetric } from './types.ts';
 
 export class MetricsService {
   constructor(private faroService: FaroService) {}
 
-  sendCustomMetric({ name, value, timestamp, ...rest }: CustomMetricBase) {
+  sendCustomMetric({ name, value, timestamp, ...rest }: CustomMetric) {
     try {
       const faroInstance = this.faroService.getInstance();
 
       faroInstance.api.pushMeasurement(
         {
           type: CUSTOM_MEASUREMENT_TYPE,
-          values: { [name]: safeNumberConversion(value) },
+          values: { [name]: toMetricValue(value) },
         },
         {
           context: constructMetricContext(rest),

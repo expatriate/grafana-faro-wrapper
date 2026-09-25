@@ -2,6 +2,7 @@ import { constructMetricContext } from '../metrics-service/helpers/constructMetr
 import { FaroService } from './FaroService.ts';
 
 jest.mock('@grafana/faro-web-sdk', () => ({
+  ...jest.requireActual('@grafana/faro-web-sdk'),
   initializeFaro: jest.fn((cfg) => ({
     ...cfg,
     paused: false,
@@ -12,7 +13,6 @@ jest.mock('@grafana/faro-web-sdk', () => ({
       this.paused = false;
     },
   })),
-  getWebInstrumentations: jest.fn(() => []),
 }));
 
 jest.mock('@grafana/faro-transport-otlp-http', () => ({
@@ -195,10 +195,10 @@ describe('FaroService', () => {
   test('init after destroy warns about options Faro cannot change and only about them', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const svc = new FaroService();
-    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop' } } as any);
+    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop', version: '1' } } as any);
 
     svc.destroy();
-    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop' } } as any);
+    svc.init({ faroUrl: 'u', faroKey: 'k', app: { version: '1', name: 'shop' } } as any);
     expect(warnSpy).not.toHaveBeenCalled();
 
     svc.destroy();

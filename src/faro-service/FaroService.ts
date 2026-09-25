@@ -1,5 +1,6 @@
 import {
   BrowserConfig,
+  deepEqual,
   Faro,
   initializeFaro,
   Instrumentation,
@@ -134,7 +135,7 @@ export class FaroService {
 
   private warnAboutIgnoredChanges(initial: FaroIdentity, identity: FaroIdentity) {
     const changed = (Object.keys(identity) as (keyof FaroIdentity)[]).filter(
-      (option) => JSON.stringify(identity[option]) !== JSON.stringify(initial[option]),
+      (option) => !deepEqual(identity[option], initial[option]),
     );
     if (changed.length > 0) {
       console.warn(

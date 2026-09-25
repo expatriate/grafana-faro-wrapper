@@ -236,8 +236,10 @@ pageReady.addMetricStep(
 - `reset()` сбрасывает результаты и останавливает таймеры, после него сбор можно запустить заново. Без `failTime`
   сборщик опрашивает незавершённые шаги до конца жизни страницы, поэтому при уходе со страницы, например
   при размонтировании компонента, вызывайте `reset()`.
-- `getStatus()` возвращает `isRunning`, `isPaused`, `isDone`, `runningTime`, `pausedDuration`, `remainingTime`
-  и списки `registeredMetrics`, `completedMetrics`, `pendingMetrics`.
+- `getStatus()` возвращает `state` — `idle`, `running`, `paused`, `finishing` (итог определён, колбэк ещё
+  не вызван) или `done`, — а также `runningTime`, `pausedDuration`, `remainingTime` и списки `registeredMetrics`,
+  `completedMetrics`, `pendingMetrics`. Флаги `isRunning`, `isPaused` и `isDone` оставлены для совместимости:
+  `isRunning` истинен в `running`, `paused` и `finishing`, `isDone` — в `finishing` и `done`.
 - `log: true` пишет ход сбора в консоль.
 
 ## Остановка и повторный запуск
@@ -283,7 +285,7 @@ Faro регистрируется один раз на страницу. Поэ�
 ### Типы
 
 `FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetricBase`, `MetricUnit`, `MetricType`, `MetricLabel`,
-`MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricFn`, `ReadyToCheckConditionFn`.
+`MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricFn`, `ReadyToCheckConditionFn`.
 
 ## Миграция с 0.2
 

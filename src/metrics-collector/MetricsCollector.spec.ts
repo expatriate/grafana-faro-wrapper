@@ -129,6 +129,25 @@ describe('MetricsCollector', () => {
     expect(finished.runningTime).toBe(1000);
   });
 
+  test('status reports the run state through the whole lifecycle', async () => {
+    const { collector } = createCollector(['render']);
+    const render = deferredCheck();
+    const states = [collector.getStatus().state];
+
+    collector.addMetricStep('render', render.check);
+    states.push(collector.getStatus().state);
+    collector.pause();
+    states.push(collector.getStatus().state);
+    render.resolve(true);
+    await advance(0);
+    collector.resume();
+    states.push(collector.getStatus().state);
+    await advance(0);
+    states.push(collector.getStatus().state);
+
+    expect(states).toEqual(['idle', 'running', 'paused', 'finishing', 'done']);
+  });
+
   test('fails with pending steps as false when failTime elapses', async () => {
     const { collector, onFail } = createCollector(['render', 'data'], 1000);
 

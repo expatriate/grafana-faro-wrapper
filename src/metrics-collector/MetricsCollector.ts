@@ -3,7 +3,24 @@ import { MetricFn, ReadyToCheckConditionFn } from './types.ts';
 
 const STEP_CHECK_INTERVAL_MS = 100;
 
-type RunState = 'idle' | 'running' | 'paused' | 'finishing' | 'done';
+export type MetricsCollectorState = 'idle' | 'running' | 'paused' | 'finishing' | 'done';
+
+interface RunClock {
+  startTime: number;
+  pausedDuration: number;
+}
+
+type RunState =
+  | { kind: 'idle' }
+  | {
+      kind: 'running';
+      clock: RunClock;
+      checkInterval: ReturnType<typeof setInterval>;
+      failTimer?: ReturnType<typeof setTimeout>;
+    }
+  | { kind: 'paused'; clock: RunClock; pausedAt: number }
+  | { kind: 'finishing'; clock: RunClock }
+  | { kind: 'done'; clock: RunClock; finishedAt: number };
 
 type Outcome = 'success' | 'fail';
 
@@ -30,7 +47,7 @@ export class MetricsCollector<T extends string = string> {
 
   private cycle = 0;
 
-  private state: RunState = 'idle';
+  private state: RunState = { kind: 'idle' };
 
   private readonly failTime?: number;
 
@@ -42,18 +59,6 @@ export class MetricsCollector<T extends string = string> {
 
   private readonly onSuccess: (params: MetricsCollectorCallback<T>) => void;
 
-  private failTimer?: ReturnType<typeof setTimeout>;
-
-  private checkInterval?: ReturnType<typeof setInterval>;
-
-  private pauseStartTime?: number;
-
-  private pausedDuration = 0;
-
-  private startTime?: number;
-
-  private finishTime?: number;
-
   constructor({ failTime, steps, onFail, onSuccess, log = false }: MetricsCollectorConfig<T>) {
     this.failTime = failTime;
     this.steps = steps;
@@ -63,60 +68,55 @@ export class MetricsCollector<T extends string = string> {
   }
 
   start() {
-    if (this.state !== 'idle') {
+    if (this.state.kind !== 'idle') {
       return;
     }
 
-    this.state = 'running';
     this.debug('start');
-
-    this.startTime = performance.now();
-    this.scheduleTimers();
+    this.run({ startTime: performance.now(), pausedDuration: 0 });
+    this.scheduleFailTimer();
   }
 
   pause() {
-    if (this.state !== 'running') {
+    if (this.state.kind !== 'running') {
       return;
     }
 
-    this.state = 'paused';
-    this.pauseStartTime = performance.now();
     this.clearTimers();
+    this.state = { kind: 'paused', clock: this.state.clock, pausedAt: performance.now() };
 
     this.debug('pause');
   }
 
   resume() {
-    if (this.state !== 'paused') {
+    if (this.state.kind !== 'paused') {
       return;
     }
 
-    this.state = 'running';
-    this.pausedDuration += performance.now() - this.pauseStartTime!;
-    this.pauseStartTime = undefined;
-
+    const { clock, pausedAt } = this.state;
     this.debug('resume');
 
+    this.run({ ...clock, pausedDuration: clock.pausedDuration + performance.now() - pausedAt });
     this.finishIfAllStepsChecked();
     this.checkSteps();
-    this.scheduleTimers();
+    this.scheduleFailTimer();
   }
 
   getStatus() {
+    const { kind } = this.state;
     const runningTime = this.activeElapsed();
     return {
-      isRunning: this.state === 'running' || this.state === 'paused' || this.state === 'finishing',
+      state: kind,
+      isRunning: kind === 'running' || kind === 'paused' || kind === 'finishing',
       isDone: this.isFinished(),
-      isPaused: this.state === 'paused',
+      isPaused: kind === 'paused',
       runningTime,
-      pausedDuration: this.pausedDuration,
+      pausedDuration: kind === 'idle' ? 0 : this.state.clock.pausedDuration,
       registeredMetrics: Array.from(this.stepChecks.keys()),
       completedMetrics: Array.from(this.stepResults.entries()),
       pendingMetrics: this.steps.filter((step) => !this.stepResults.has(step)),
       remainingTime:
-        this.failTime && this.startTime !== undefined
-          ? Math.max(0, this.failTime - runningTime)
-          : undefined,
+        this.failTime && kind !== 'idle' ? Math.max(0, this.failTime - runningTime) : undefined,
     };
   }
 
@@ -138,54 +138,62 @@ export class MetricsCollector<T extends string = string> {
     this.clearTimers();
 
     this.cycle++;
-    this.state = 'idle';
+    this.state = { kind: 'idle' };
     this.stepChecks.clear();
     this.stepResults.clear();
     this.checksInProgress.clear();
-    this.startTime = undefined;
-    this.finishTime = undefined;
-    this.pausedDuration = 0;
-    this.pauseStartTime = undefined;
 
     this.debug('reset');
   }
 
   private isFinished() {
-    return this.state === 'finishing' || this.state === 'done';
+    return this.state.kind === 'finishing' || this.state.kind === 'done';
   }
 
   private activeElapsed() {
-    if (this.startTime === undefined) {
+    const { state } = this;
+    if (state.kind === 'idle') {
       return 0;
     }
-    const end = this.finishTime ?? this.pauseStartTime ?? performance.now();
-    return end - this.startTime - this.pausedDuration;
+    const end =
+      state.kind === 'paused'
+        ? state.pausedAt
+        : state.kind === 'done'
+          ? state.finishedAt
+          : performance.now();
+    return end - state.clock.startTime - state.clock.pausedDuration;
   }
 
-  private scheduleTimers() {
-    this.checkInterval = setInterval(() => this.checkSteps(), STEP_CHECK_INTERVAL_MS);
+  private run(clock: RunClock) {
+    this.state = {
+      kind: 'running',
+      clock,
+      checkInterval: setInterval(() => this.checkSteps(), STEP_CHECK_INTERVAL_MS),
+    };
+  }
 
-    if (!this.failTime) {
+  private scheduleFailTimer() {
+    if (!this.failTime || this.state.kind !== 'running') {
       return;
     }
 
     const remaining = this.failTime - this.activeElapsed();
     if (remaining > 0) {
-      this.failTimer = setTimeout(() => this.finish('fail'), remaining);
+      this.state.failTimer = setTimeout(() => this.finish('fail'), remaining);
     } else {
       this.finish('fail');
     }
   }
 
   private clearTimers() {
-    clearTimeout(this.failTimer);
-    clearInterval(this.checkInterval);
-    this.failTimer = undefined;
-    this.checkInterval = undefined;
+    if (this.state.kind === 'running') {
+      clearTimeout(this.state.failTimer);
+      clearInterval(this.state.checkInterval);
+    }
   }
 
   private async checkSteps() {
-    if (this.state === 'paused') {
+    if (this.state.kind === 'paused') {
       return;
     }
 
@@ -241,7 +249,7 @@ export class MetricsCollector<T extends string = string> {
   }
 
   private finishIfAllStepsChecked() {
-    if (this.state !== 'running') {
+    if (this.state.kind !== 'running') {
       return;
     }
 
@@ -252,20 +260,20 @@ export class MetricsCollector<T extends string = string> {
   }
 
   private finish(outcome: Outcome) {
-    if (this.isFinished()) {
+    if (this.state.kind !== 'running') {
       return;
     }
 
-    this.state = 'finishing';
+    this.clearTimers();
+    const { clock } = this.state;
+    this.state = { kind: 'finishing', clock };
     const cycle = this.cycle;
 
     queueMicrotask(() => {
       if (cycle !== this.cycle) {
         return;
       }
-      this.state = 'done';
-      this.finishTime = performance.now();
-      this.clearTimers();
+      this.state = { kind: 'done', clock, finishedAt: performance.now() };
 
       const result: MetricsCollectorCallback<T> = {
         timestamp: Date.now(),

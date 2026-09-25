@@ -144,7 +144,11 @@ describe('MetricsCollector', () => {
     const { collector, onSuccess } = createCollector(['render']);
     let ready = false;
 
-    collector.addMetricStep('render', () => true, () => ready);
+    collector.addMetricStep(
+      'render',
+      () => true,
+      () => ready,
+    );
     await advance(CHECK_INTERVAL * 5);
     expect(onSuccess).not.toHaveBeenCalled();
 

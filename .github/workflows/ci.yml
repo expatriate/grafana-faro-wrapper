@@ -26,6 +26,7 @@ jobs:
           npm install --no-save --ignore-scripts
           @grafana/faro-web-sdk@${{ matrix.faro }}
           @grafana/faro-transport-otlp-http@${{ matrix.faro }}
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

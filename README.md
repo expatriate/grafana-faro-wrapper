@@ -230,7 +230,9 @@ pageReady.addMetricStep(
 - Третий аргумент — условие готовности: пока оно возвращает `false`, проверка не запускается. Если условие
   бросает исключение, шаг считается проваленным.
 - `pause()` и `resume()` останавливают и продолжают отсчёт — например, пока вкладка скрыта.
-- `reset()` сбрасывает результаты, после него сбор можно запустить заново.
+- `reset()` сбрасывает результаты и останавливает таймеры, после него сбор можно запустить заново. Без `failTime`
+  сборщик опрашивает незавершённые шаги до конца жизни страницы, поэтому при уходе со страницы, например
+  при размонтировании компонента, вызывайте `reset()`.
 - `getStatus()` возвращает `isRunning`, `isPaused`, `isDone`, `runningTime`, `pausedDuration`, `remainingTime`
   и списки `registeredMetrics`, `completedMetrics`, `pendingMetrics`.
 - `log: true` пишет ход сбора в консоль.
@@ -294,6 +296,7 @@ Faro регистрируется один раз на страницу. Поэ�
 npm install
 npm run dev              # сборка в watch-режиме
 npm run typecheck
+npm run format           # Prettier; в CI — format:check
 npm test
 npm run build
 npm run verify:package   # точки входа, типы и загрузка UMD

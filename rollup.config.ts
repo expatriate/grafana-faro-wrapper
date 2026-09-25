@@ -1,10 +1,12 @@
-import commonjs from '@rollup/plugin-commonjs';
-import resolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
 
-const external = ['@grafana/faro-react', '@grafana/faro-transport-otlp-http'];
+const globals = {
+  '@grafana/faro-react': 'GrafanaFaroReact',
+  '@grafana/faro-transport-otlp-http': 'GrafanaFaroTransportOtlpHttp',
+};
+const external = Object.keys(globals);
 
 const compileTs = () => typescript({ noEmit: false, rewriteRelativeImportExtensions: true });
 
@@ -12,12 +14,14 @@ export default [
   {
     input: 'src/index.ts',
     output: {
-      file: 'dist/react-version/index.umd.js',
+      file: 'dist/index.umd.js',
       format: 'umd',
-      name: 'FaroReactWrapper',
+      name: 'GrafanaFaroWrapper',
+      globals,
       plugins: [terser()],
     },
-    plugins: [resolve({ browser: true, preferBuiltins: false }), commonjs(), compileTs()],
+    external,
+    plugins: [compileTs()],
   },
   {
     input: 'src/index.ts',

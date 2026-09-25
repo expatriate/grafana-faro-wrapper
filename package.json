@@ -29,8 +29,8 @@
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
-  "unpkg": "dist/react-version/index.umd.js",
-  "jsdelivr": "dist/react-version/index.umd.js",
+  "unpkg": "dist/index.umd.js",
+  "jsdelivr": "dist/index.umd.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
@@ -58,8 +58,6 @@
   "devDependencies": {
     "@grafana/faro-react": "^2.12.1",
     "@grafana/faro-transport-otlp-http": "^2.12.1",
-    "@rollup/plugin-commonjs": "^29.0.3",
-    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",

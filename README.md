@@ -30,6 +30,21 @@ npm install grafana-faro-wrapper @grafana/faro-react @grafana/faro-transport-otl
 }
 ```
 
+### Без сборщика
+
+UMD-бандл берёт Faro из глобалов его собственных IIFE-бандлов, поэтому они подключаются раньше:
+
+```html
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/@grafana/faro-web-sdk/dist/bundle/faro-web-sdk.iife.js"></script>
+<script src="https://unpkg.com/@grafana/faro-react/dist/bundle/faro-react.iife.js"></script>
+<script src="https://unpkg.com/@grafana/faro-transport-otlp-http/dist/bundle/faro-transport-otlp-http.iife.js"></script>
+<script src="https://unpkg.com/grafana-faro-wrapper"></script>
+<script>
+  const faro = new GrafanaFaroWrapper.FaroService();
+</script>
+```
+
 ## Использование
 
 ### Инициализация Faro

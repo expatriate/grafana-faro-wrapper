@@ -1,6 +1,7 @@
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
@@ -35,3 +36,16 @@ if (missing.length) {
   process.exit(1);
 }
 console.log(`\n✓ All ${entries.length} declared entry points resolve to built files.`);
+
+const browserGlobals = { GrafanaFaroReact: {}, GrafanaFaroTransportOtlpHttp: {} };
+try {
+  runInNewContext(readFileSync(resolve(root, pkg.unpkg), 'utf8'), browserGlobals);
+} catch (error) {
+  console.error(`✗ ${pkg.unpkg} fails to load in a browser-like context: ${error.message}`);
+  process.exit(1);
+}
+if (typeof browserGlobals.GrafanaFaroWrapper?.FaroService !== 'function') {
+  console.error(`✗ ${pkg.unpkg} does not expose GrafanaFaroWrapper.FaroService`);
+  process.exit(1);
+}
+console.log(`✓ ${pkg.unpkg} loads in a browser-like context as GrafanaFaroWrapper.`);

@@ -1,4 +1,11 @@
+import {
+  BaseTransport,
+  initializeFaro,
+  InternalLoggerLevel,
+  TransportItem,
+} from '@grafana/faro-core';
 import { MetricsService } from './MetricsService.ts';
+import { CustomMetricBase } from './types.ts';
 
 describe('MetricsService', () => {
   let pushMeasurement: jest.Mock;
@@ -34,8 +41,49 @@ describe('MetricsService', () => {
           'measurement.result': 'success',
           'measurement.buckets': '10,100',
         },
+        skipDedupe: true,
       },
     );
+  });
+
+  test('delivers every identical metric instead of deduplicating repeats', () => {
+    const delivered: TransportItem[] = [];
+    class CollectingTransport extends BaseTransport {
+      readonly name = 'collecting';
+      readonly version = '0';
+      send(items: TransportItem | TransportItem[]) {
+        delivered.push(...[items].flat());
+      }
+    }
+    const faro = initializeFaro({
+      app: { name: 'test' },
+      batching: { enabled: false },
+      dedupe: true,
+      globalObjectKey: 'faroDedupeTest',
+      instrumentations: [],
+      internalLoggerLevel: InternalLoggerLevel.OFF,
+      isolate: true,
+      metas: [],
+      parseStacktrace: () => ({ frames: [] }),
+      paused: false,
+      preventGlobalExposure: true,
+      transports: [new CollectingTransport()],
+      unpatchedConsole: console,
+    });
+    const click: CustomMetricBase = {
+      timestamp: 0,
+      name: 'user_action',
+      value: 1,
+      description: 'button click',
+      unit: 'EVENTS',
+      type: 'counter',
+    };
+    const realFaroService: any = { getInstance: () => faro };
+
+    new MetricsService(realFaroService).sendCustomMetric(click);
+    new MetricsService(realFaroService).sendCustomMetric(click);
+
+    expect(delivered.filter((item) => item.type === 'measurement')).toHaveLength(2);
   });
 
   test('converts non-numeric value to 0', () => {

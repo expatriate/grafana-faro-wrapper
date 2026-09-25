@@ -15,7 +15,7 @@ export class MetricsService {
           type: 'custom',
           values: { [name]: safeNumberConversion(value) },
         },
-        { context: constructMetricContext(rest) },
+        { context: constructMetricContext(rest), skipDedupe: true },
       );
     } catch (e) {
       console.warn(

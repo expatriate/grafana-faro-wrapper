@@ -1,7 +1,16 @@
 import { FaroService } from './FaroService.ts';
 
 jest.mock('@grafana/faro-react', () => ({
-  initializeFaro: jest.fn((cfg) => cfg),
+  initializeFaro: jest.fn((cfg) => ({
+    ...cfg,
+    paused: false,
+    pause() {
+      this.paused = true;
+    },
+    unpause() {
+      this.paused = false;
+    },
+  })),
   getWebInstrumentations: jest.fn(() => []),
 }));
 
@@ -118,5 +127,38 @@ describe('FaroService', () => {
     svc.destroy();
     expect(svc.isInitialized).toBe(false);
     expect(() => svc.getInstance()).toThrow();
+  });
+
+  test('destroy stops sending and init resumes the same Faro instance', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+
+    svc.destroy();
+    expect(faro.paused).toBe(true);
+
+    const resumed = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    expect(resumed).toBe(faro);
+    expect(faro.paused).toBe(false);
+    expect(svc.getInstance()).toBe(faro);
+  });
+
+  test('destroy keeps default URL sanitization for beacons Faro still produces', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+
+    svc.destroy();
+    const beacon = faro.beforeSend({
+      meta: { page: { url: 'https://example.com/users/1234567?accessToken=secret' } },
+    });
+
+    expect(beacon.meta.page.url).toBe('example.com/users/:id');
+  });
+
+  test('init throws when Faro is already registered outside the service', () => {
+    initializeFaro.mockReturnValueOnce(undefined);
+    const svc = new FaroService();
+
+    expect(() => svc.init({ faroUrl: 'u', faroKey: 'k' } as any)).toThrow(/already registered/);
+    expect(svc.isInitialized).toBe(false);
   });
 });

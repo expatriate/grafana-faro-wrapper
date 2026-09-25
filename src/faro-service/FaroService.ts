@@ -20,11 +20,16 @@ interface FaroConfig {
 
 type Sanitizer = (beacon: Record<string, any>) => Record<string, any>;
 
+const DEFAULT_SANITIZERS: Sanitizer[] = [
+  sanitizePageUrlParams,
+  sanitizeEventUrlParams,
+  sanitizeContextLabelsValues,
+];
+
 export class FaroService {
   private instance: Faro | null = null;
-  private sanitizers = [sanitizePageUrlParams, sanitizeEventUrlParams, sanitizeContextLabelsValues];
-
-  private _isInitialized = false;
+  private registeredFaro: Faro | null = null;
+  private sanitizers = [...DEFAULT_SANITIZERS];
 
   init({
     faroKey,
@@ -35,12 +40,18 @@ export class FaroService {
     routerAdapter,
     ...rest
   }: FaroConfig & BrowserConfig & { routerAdapter?: ReactIntegration }): Faro {
-    if (this._isInitialized) {
+    if (this.instance) {
       console.warn('[Faro-react-wrapper] FaroService already initialized');
-      return this.instance!;
+      return this.instance;
     }
 
-    this.instance = initializeFaro({
+    if (this.registeredFaro) {
+      this.registeredFaro.unpause();
+      this.instance = this.registeredFaro;
+      return this.instance;
+    }
+
+    const faro = initializeFaro({
       transports: [
         new OtlpHttpTransport({
           apiKey: faroKey,
@@ -67,9 +78,13 @@ export class FaroService {
       ...rest,
     });
 
-    this._isInitialized = true;
+    if (!faro) {
+      throw new Error('[Faro-react-wrapper] Faro is already registered outside FaroService');
+    }
 
-    return this.instance;
+    this.registeredFaro = faro;
+    this.instance = faro;
+    return faro;
   }
 
   addSanitizer(sanitizer: Sanitizer | Sanitizer[]) {
@@ -78,7 +93,7 @@ export class FaroService {
   }
 
   get isInitialized() {
-    return this._isInitialized;
+    return this.instance !== null;
   }
 
   getInstance(): Faro {
@@ -112,9 +127,9 @@ export class FaroService {
 
   destroy() {
     if (this.instance) {
+      this.instance.pause();
       this.instance = null;
-      this._isInitialized = false;
-      this.sanitizers = [];
+      this.sanitizers = [...DEFAULT_SANITIZERS];
     }
   }
 }

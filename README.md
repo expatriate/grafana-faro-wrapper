@@ -10,7 +10,8 @@
 
 - **`FaroService`** — инициализация Faro с OTLP HTTP-транспортом, санитизация биконов, пауза и повторный запуск.
 - **`sendMetric`** — пользовательские метрики с единицей, типом, метками и результатом.
-- **`MetricsCollector`** — SLO-метрика: ждёт, пока пройдут все шаги, с таймаутом и паузой.
+- **`trackSlo`** — SLO-метрика: ждёт, пока пройдут все шаги, с дедлайнами, паузой при скрытой вкладке и
+  отправкой в едином формате.
 - **Проверки вёрстки** — готовые проверки для шагов: элементы отрисованы, их достаточно, картинки и фоны
   загрузились.
 
@@ -181,63 +182,58 @@ faro.sendMetric({
 
 ## SLO-метрика из нескольких шагов
 
-`MetricsCollector` ждёт, пока каждый шаг даст результат. Если все шаги прошли, вызывается `onSuccess`. Если
-какой-то шаг провалился или истёк `failTime`, вызывается `onFail`, а шаги без результата считаются
-проваленными. Время на паузе в длительность не входит.
+`trackSlo` измеряет, за сколько страница дошла до состояния, описанного шагами, и отправляет гистограмму
+длительности в миллисекундах. Каждый шаг — предикат, который опрашивается каждые 100 мс, пока не вернёт
+`true`. Когда все шаги прошли — `result: 'success'`; если какой-то шаг не успел к своему дедлайну —
+`result: 'fail'`, и в метках видно, какой именно.
 
 ```typescript
-import { MetricsCollector } from 'grafana-faro-wrapper';
-
-const pageReady = new MetricsCollector<'data' | 'render'>({
-  steps: ['data', 'render'],
+const pageReady = faro.trackSlo({
+  name: 'page_ready',
   failTime: 10_000,
-  onSuccess: ({ duration }) =>
-    faro.sendMetric({
-      name: 'page_ready',
-      value: duration,
-      unit: 'MILLISECONDS',
-      type: 'histogram',
-      result: 'success',
-    }),
-  onFail: ({ duration, steps }) =>
-    faro.sendMetric({
-      name: 'page_ready',
-      value: duration,
-      unit: 'MILLISECONDS',
-      type: 'histogram',
-      result: 'fail',
-      labels: {
-        failed_steps: Object.entries(steps)
-          .filter(([, passed]) => !passed)
-          .map(([step]) => step)
-          .join(','),
-      },
-    }),
+  buckets: [100, 500, 1000, 2000, 5000, 10_000, 10_100],
+  steps: {
+    data: async () => (await fetchData()).ok,
+    render: () => isRendered(),
+    images: { check: () => asyncCheckImagesIsDisplayed('img.hero'), failTime: 3000 },
+  },
 });
 
-pageReady.addStep('data', async () => (await fetchData()).ok);
-pageReady.addStep(
-  'render',
-  () => true,
-  () => isRendered(),
-);
+pageReady.dispose(); // при уходе со страницы — остановить без отправки
 ```
 
-- Первый `addStep` запускает отсчёт. `failTime`, равный `0` или не заданный, означает «без таймаута». Шаги не из `steps` и повторная регистрация шага игнорируются.
-- Проверка шага запускается сразу при регистрации, а затем каждые 100 мс, пока не вернёт результат. Исключение или отклонённый промис
-  считаются провалом.
-- Третий аргумент — условие готовности: пока оно возвращает `false`, проверка не запускается. Если условие
-  бросает исключение, шаг считается проваленным.
-- `pause()` и `resume()` останавливают и продолжают отсчёт — например, пока вкладка скрыта.
-- `reset()` сбрасывает результаты и останавливает таймеры, после него сбор можно запустить заново. Без `failTime`
-  сборщик опрашивает незавершённые шаги до конца жизни страницы, поэтому при уходе со страницы, например
-  при размонтировании компонента, вызывайте `reset()`.
-- `getStatus()` возвращает `state` — `idle`, `running`, `paused`, `finishing` (итог определён, колбэк ещё
-  не вызван) или `done`, — а также `runningTime`, `pausedDuration`, `remainingTime` и списки `registeredSteps`,
-  `completedSteps`, `pendingSteps`.
-- `start()`, `pause()`, `resume()`, `reset()` и `addStep()` возвращают сам сборщик, вызовы можно объединять
-  в цепочку.
-- `log: true` пишет ход сбора в консоль.
+| Поле              | Описание                                                                                        |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| `name`            | Имя метрики                                                                                     |
+| `failTime`        | Дедлайн всего прогона в мс; по его истечении метрика отправляется с `fail`                      |
+| `steps`           | Шаги: функция или `{ check, failTime }`. Дедлайн шага не может быть больше дедлайна прогона     |
+| `buckets`         | Границы бакетов гистограммы, необязательно                                                      |
+| `labels`          | Функция, которая возвращает дополнительные метки в момент отправки, необязательно               |
+| `startWhen`       | Предикат: пока он `false`, часы не идут — например, пока не появился нужный блок, необязательно |
+| `pauseWhenHidden` | Пауза, пока вкладка скрыта или окно без фокуса; по умолчанию `true`                             |
+| `log`             | Писать ход прогона в консоль                                                                    |
+
+- Проверка шага запускается сразу при старте, а затем каждые 100 мс. Исключение или отклонённый промис —
+  «ещё не готов», повтор на следующем тике. Асинхронная проверка не запускается заново, пока идёт предыдущая.
+- Шаг, не успевший к дедлайну, получает `false` окончательно, но прогон ждёт остальные шаги — до своего
+  `failTime`.
+- Время на паузе не входит ни в длительность, ни в дедлайны.
+- Отправляется одно измерение: `value` — длительность, `unit: 'MILLISECONDS'`, `type: 'histogram'`,
+  `result`, а в `labels` — `status` (то же, что `result`), результат каждого шага (`true`/`false`) и метки из
+  `labels()`.
+- `state` трекера: `waiting` (ждёт `startWhen`), `running`, `paused`, `done`, `disposed`.
+- Без `dispose()` незавершённый прогон опрашивает шаги до `failTime`; при уходе со страницы, например при
+  размонтировании компонента, вызывайте `dispose()` — метрика при этом не отправляется.
+
+В React прогон живёт в эффекте, а смена состояния страницы — это смена зависимости эффекта:
+
+```typescript
+useEffect(() => {
+  if (!isOpen) return;
+  const slo = faro.trackSlo({ name: `payments:${view}`, failTime: 40_000, steps });
+  return () => slo.dispose();
+}, [isOpen, view]);
+```
 
 ## Проверки вёрстки
 
@@ -253,18 +249,17 @@ import {
   checkRenderInnerValue,
 } from 'grafana-faro-wrapper';
 
-paymentReady
-  .addStep('tariff', () => checkRenderInnerValue(['[data-slo="tariff-name"]']))
-  .addStep('methods', () => checkGTEAmount('[data-slo="payment-list"] li', 12))
-  .addStep(
-    'method-images',
-    () => asyncCheckImagesIsDisplayed('[data-slo="payment-list"] img'),
-    () => checkGTEAmount('[data-slo="payment-list"] img', 1),
-  )
-  .addStep('reseller-logos', () =>
-    asyncCheckBackgroundImagesIsDisplayed('[data-slo="reseller-link"]'),
-  )
-  .addStep('controls', () => checkRender(['[data-slo="code-input"]', '[data-slo="code-button"]']));
+faro.trackSlo({
+  name: 'payments:payments-all',
+  failTime: 4000,
+  steps: {
+    tariff: () => checkRenderInnerValue(['[data-slo="tariff-name"]']),
+    methods: () => checkGTEAmount('[data-slo="payment-list"] li', 12),
+    'method-images': () => asyncCheckImagesIsDisplayed('[data-slo="payment-list"] img'),
+    'reseller-logos': () => asyncCheckBackgroundImagesIsDisplayed('[data-slo="reseller-link"]'),
+    controls: () => checkRender(['[data-slo="code-input"]', '[data-slo="code-button"]']),
+  },
+});
 ```
 
 | Хелпер                                                        | Проходит, когда                                                                     |
@@ -282,8 +277,8 @@ paymentReady
 
 - `timeoutMs` по умолчанию — `DEFAULT_IMAGE_TIMEOUT_MS` (10 секунд). Картинка, которая не загрузилась за это
   время, не прошла проверку.
-- Если элементов по селектору нет, проверки количества и отрисовки возвращают `false`, поэтому для картинок,
-  которые появляются позже, добавляйте условие готовности, как в примере.
+- Если элементов по селектору нет, проверки возвращают `false` — шаг просто ждёт следующего тика, пока
+  элементы не появятся.
 - Растровая картинка с нулевой шириной считается сломанной, SVG без собственных размеров — загруженным.
 - «IsDisplayed» значит «загружено», а не «видно на экране»: элемент с `display: none` тоже пройдёт проверку.
 - Из `background-image` берётся первый `url()`: у `image-set(...)` это первый вариант, а не тот, что выбрал
@@ -311,26 +306,22 @@ Faro регистрируется один раз на страницу. Поэ�
 | `isInitialized`            | `true` между `init()` и `destroy()`                            |
 | `destroy()`                | Ставит Faro на паузу и сбрасывает пользовательские санитайзеры |
 | `sendMetric(metric)`       | Отправляет метрику, поля — см. таблицу выше                    |
+| `trackSlo(config)`         | Запускает SLO-прогон и возвращает `SloTracker`                 |
 
 `config` (тип `FaroServiceConfig`) — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательные
 `routerAdapter` и `enabled`.
 
-### `MetricsCollector<T>`
+### `SloTracker`
 
-| Член                                                                  | Описание                                      |
-| --------------------------------------------------------------------- | --------------------------------------------- |
-| `new MetricsCollector({ steps, failTime?, onSuccess, onFail, log? })` | Сборщик для шагов `T`                         |
-| `addStep(step, check, isReady?)`                                      | Регистрирует проверку шага и запускает отсчёт |
-| `start()`, `pause()`, `resume()`, `reset()`                           | Управление отсчётом                           |
-| `getStatus()`                                                         | Текущее состояние                             |
-
-Колбэки получают `{ timestamp, duration, steps }`, где `steps` — результат по каждому шагу.
+| Член        | Описание                                           |
+| ----------- | -------------------------------------------------- |
+| `state`     | `waiting`, `running`, `paused`, `done`, `disposed` |
+| `dispose()` | Останавливает прогон без отправки метрики          |
 
 ### Типы
 
 `FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `Metric`, `MetricResult`, `MetricUnit`, `MetricType`, `MetricLabels`,
-`MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricsCollectorState`, `MetricsCollectorStatus`,
-`StepCheck`, `StepReadinessCheck`.
+`SloConfig`, `SloTracker`, `SloRunState`, `SloRunResult`, `StepCheck`, `StepConfig`, `StepResults`.
 
 Хелперы проверки вёрстки описаны в разделе «Проверки вёрстки».
 

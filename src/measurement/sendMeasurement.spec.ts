@@ -1,41 +1,11 @@
-import {
-  BaseTransport,
-  initializeFaro,
-  InternalLoggerLevel,
-  TransportItem,
-} from '@grafana/faro-core';
-import { parseMetricLabels } from './parseMetricLabels.ts';
+import { createRealFaro } from './realFaroFixture.ts';
 import { sendMeasurement } from './sendMeasurement.ts';
 import { Metric } from './types.ts';
 
 function sendThroughRealFaro(...metrics: Metric[]): Record<string, any>[] {
-  const delivered: TransportItem[] = [];
-  class CollectingTransport extends BaseTransport {
-    readonly name = 'collecting';
-    readonly version = '0';
-    send(items: TransportItem | TransportItem[]) {
-      delivered.push(...[items].flat());
-    }
-  }
-  const faro = initializeFaro({
-    app: { name: 'test' },
-    batching: { enabled: false },
-    beforeSend: parseMetricLabels,
-    dedupe: true,
-    globalObjectKey: 'faroMetricsTest',
-    instrumentations: [],
-    internalLoggerLevel: InternalLoggerLevel.OFF,
-    isolate: true,
-    metas: [],
-    parseStacktrace: () => ({ frames: [] }),
-    paused: false,
-    preventGlobalExposure: true,
-    transports: [new CollectingTransport()],
-    unpatchedConsole: console,
-  });
-
+  const { faro, measurements } = createRealFaro();
   metrics.forEach((metric) => sendMeasurement(faro, metric));
-  return delivered.filter((item) => item.type === 'measurement').map((item) => item.payload);
+  return measurements();
 }
 
 const click: Metric = { name: 'user_action', value: 1, unit: 'EVENTS', type: 'counter' };

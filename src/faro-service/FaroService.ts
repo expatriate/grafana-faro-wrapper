@@ -11,6 +11,7 @@ import { MEASUREMENT_KEYS } from '../measurement/keys.ts';
 import { parseMetricLabels } from '../measurement/parseMetricLabels.ts';
 import { sendMeasurement } from '../measurement/sendMeasurement.ts';
 import { Metric } from '../measurement/types.ts';
+import { SloConfig, SloTracker, trackSlo } from '../slo/trackSlo.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
 import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers.ts';
@@ -139,6 +140,10 @@ export class FaroService {
         error instanceof Error ? error.message : 'Unknown error',
       );
     }
+  }
+
+  trackSlo<S extends string>(config: SloConfig<S>): SloTracker {
+    return trackSlo((metric) => this.sendMetric(metric), config);
   }
 
   get isInitialized() {

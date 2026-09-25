@@ -46,10 +46,13 @@ const OTLP_LOG_BODIES: OtlpTransform = {
   },
 };
 
+type FaroIdentity = Pick<FaroConfig & BrowserConfig, 'faroUrl' | 'faroKey' | 'app'>;
+
 export class FaroService {
   private instance: Faro | null = null;
-  private registeredFaro: Faro | null = null;
+  private registered: { faro: Faro; identity: FaroIdentity } | null = null;
   private sanitizers = [...DEFAULT_SANITIZERS];
+  private userBeforeSend: BrowserConfig['beforeSend'];
 
   init({
     faroKey,
@@ -65,9 +68,13 @@ export class FaroService {
       return this.instance;
     }
 
-    if (this.registeredFaro) {
-      this.registeredFaro.unpause();
-      this.instance = this.registeredFaro;
+    this.userBeforeSend = beforeSend;
+    const identity = { faroUrl, faroKey, app: rest.app };
+
+    if (this.registered) {
+      this.warnAboutIgnoredChanges(this.registered.identity, identity);
+      this.registered.faro.unpause();
+      this.instance = this.registered.faro;
       return this.instance;
     }
 
@@ -88,7 +95,7 @@ export class FaroService {
           ...beacon,
         } as Record<string, any>) as TransportItem;
 
-        return beforeSend ? beforeSend(sanitized) : sanitized;
+        return this.userBeforeSend ? this.userBeforeSend(sanitized) : sanitized;
       },
 
       ...rest,
@@ -98,7 +105,7 @@ export class FaroService {
       throw new Error('[Faro-react-wrapper] Faro is already registered outside FaroService');
     }
 
-    this.registeredFaro = faro;
+    this.registered = { faro, identity };
     this.instance = faro;
     return faro;
   }
@@ -124,6 +131,17 @@ export class FaroService {
       this.instance.pause();
       this.instance = null;
       this.sanitizers = [...DEFAULT_SANITIZERS];
+    }
+  }
+
+  private warnAboutIgnoredChanges(initial: FaroIdentity, identity: FaroIdentity) {
+    const changed = (Object.keys(identity) as (keyof FaroIdentity)[]).filter(
+      (option) => JSON.stringify(identity[option]) !== JSON.stringify(initial[option]),
+    );
+    if (changed.length > 0) {
+      console.warn(
+        `[Faro-react-wrapper] Faro cannot be re-initialized, changed options are ignored: ${changed.join(', ')}`,
+      );
     }
   }
 }

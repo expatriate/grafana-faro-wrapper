@@ -167,6 +167,31 @@ describe('FaroService', () => {
     expect(svc.getInstance()).toBe(faro);
   });
 
+  test('init after destroy applies the new beforeSend', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k', beforeSend: (b: any) => b } as any);
+    svc.destroy();
+
+    svc.init({ faroUrl: 'u', faroKey: 'k', beforeSend: () => null } as any);
+
+    expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
+  });
+
+  test('init after destroy warns about options Faro cannot change and only about them', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const svc = new FaroService();
+    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop' } } as any);
+
+    svc.destroy();
+    svc.init({ faroUrl: 'u', faroKey: 'k', app: { name: 'shop' } } as any);
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    svc.destroy();
+    svc.init({ faroUrl: 'u', faroKey: 'k2', app: { name: 'admin' } } as any);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('faroKey, app'));
+    warnSpy.mockRestore();
+  });
+
   test('destroy keeps default URL sanitization for beacons Faro still produces', () => {
     const svc = new FaroService();
     const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);

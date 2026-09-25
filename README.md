@@ -12,7 +12,7 @@
 - **`MetricsService`** — пользовательские метрики с единицей, типом, метками и результатом.
 - **`MetricsCollector`** — SLO-метрика: ждёт, пока пройдут все шаги, с таймаутом и паузой.
 
-Работает с Faro 1.19+ и 2.x.
+Работает с Faro 1.19+ и 2.x. Бандл собран под ES2019 и работает в Chrome 73+, Firefox 69+, Safari 12.1+.
 
 ## Установка
 
@@ -141,6 +141,9 @@ faro.addSanitizer((beacon) => ({
 }));
 ```
 
+Если санитайзер бросает исключение, бикон не отправляется, чтобы неочищенные данные не ушли в Grafana, а в
+консоль один раз выводится предупреждение.
+
 Ваш `beforeSend` вызывается последним и получает уже очищенный бикон. Чтобы отбросить бикон, верните `null`.
 
 ## Пользовательские метрики
@@ -256,7 +259,8 @@ Faro регистрируется один раз на страницу. Поэ�
 | `isInitialized`            | `true` между `init()` и `destroy()`                            |
 | `destroy()`                | Ставит Faro на паузу и сбрасывает пользовательские санитайзеры |
 
-`config` — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательный `routerAdapter`.
+`config` (тип `FaroServiceConfig`) — это `BrowserConfig` из Faro плюс `faroUrl`, `faroKey` и необязательный
+`routerAdapter`.
 
 ### `MetricsService`
 
@@ -278,7 +282,7 @@ Faro регистрируется один раз на страницу. Поэ�
 
 ### Типы
 
-`FaroConfig`, `Sanitizer`, `CustomMetricBase`, `MetricUnit`, `MetricType`, `MetricLabel`,
+`FaroServiceConfig`, `FaroConfig`, `Sanitizer`, `CustomMetricBase`, `MetricUnit`, `MetricType`, `MetricLabel`,
 `MetricsCollectorConfig`, `MetricsCollectorCallback`, `MetricFn`, `ReadyToCheckConditionFn`.
 
 ## Миграция с 0.2

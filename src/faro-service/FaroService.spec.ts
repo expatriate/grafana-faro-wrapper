@@ -124,6 +124,27 @@ describe('FaroService', () => {
     }
   });
 
+  test('drops only beacons a sanitizer throws on and warns once', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const svc = new FaroService();
+    const faro: any = svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
+    svc.addSanitizer((beacon) => {
+      if (beacon.type === 'exception') throw new Error('boom');
+      return beacon;
+    });
+
+    const dropped = [
+      faro.beforeSend({ type: 'exception' }),
+      faro.beforeSend({ type: 'exception' }),
+    ];
+    const kept = faro.beforeSend({ type: 'log' });
+
+    expect(dropped).toEqual([null, null]);
+    expect(kept).toMatchObject({ type: 'log' });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
   describe('OTLP log body', () => {
     function initTransforms() {
       new FaroService().init({ faroUrl: 'u', faroKey: 'k' } as any);

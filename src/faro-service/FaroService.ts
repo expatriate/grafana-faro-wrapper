@@ -18,6 +18,8 @@ export interface FaroConfig {
   faroKey: string;
 }
 
+export type FaroServiceConfig = FaroConfig & BrowserConfig & { routerAdapter?: Instrumentation };
+
 export type Sanitizer = (beacon: Record<string, any>) => Record<string, any>;
 
 type OtlpTransform = NonNullable<
@@ -51,6 +53,7 @@ export class FaroService {
   private registered: { faro: Faro; identity: FaroIdentity } | null = null;
   private sanitizers = [...DEFAULT_SANITIZERS];
   private userBeforeSend: BrowserConfig['beforeSend'];
+  private sanitizerFailureReported = false;
 
   init({
     faroKey,
@@ -60,7 +63,7 @@ export class FaroService {
     beforeSend,
     routerAdapter,
     ...rest
-  }: FaroConfig & BrowserConfig & { routerAdapter?: Instrumentation }): Faro {
+  }: FaroServiceConfig): Faro {
     if (this.instance) {
       console.warn(`${LOG_PREFIX} FaroService already initialized`);
       return this.instance;
@@ -89,11 +92,10 @@ export class FaroService {
       instrumentations: [...(routerAdapter ? [routerAdapter] : []), ...instrumentations],
 
       beforeSend: (beacon) => {
-        const sanitized = this.sanitizers.reduce((item, sanitize) => sanitize(item), {
-          ...beacon,
-          meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)),
-        } as Record<string, any>) as TransportItem;
-
+        const sanitized = this.sanitize(beacon);
+        if (!sanitized) {
+          return null;
+        }
         return this.userBeforeSend ? this.userBeforeSend(sanitized) : sanitized;
       },
 
@@ -130,6 +132,21 @@ export class FaroService {
       this.instance.pause();
       this.instance = null;
       this.sanitizers = [...DEFAULT_SANITIZERS];
+    }
+  }
+
+  private sanitize(beacon: TransportItem): TransportItem | null {
+    try {
+      return this.sanitizers.reduce((item, sanitize) => sanitize(item), {
+        ...beacon,
+        meta: beacon.meta && JSON.parse(JSON.stringify(beacon.meta)),
+      } as Record<string, any>) as TransportItem;
+    } catch (error) {
+      if (!this.sanitizerFailureReported) {
+        this.sanitizerFailureReported = true;
+        console.warn(`${LOG_PREFIX} A sanitizer threw, beacons it fails on are dropped:`, error);
+      }
+      return null;
     }
   }
 

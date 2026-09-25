@@ -18,7 +18,7 @@ export function sanitizeUrl(input: string): string {
   }
 }
 
-export function sanitizePageUrlParams(beacon: Record<string, any>): Record<string, any> {
+export function sanitizePageUrl(beacon: Record<string, any>): Record<string, any> {
   if (!beacon.meta?.page?.url) return beacon;
 
   return {
@@ -33,7 +33,7 @@ export function sanitizePageUrlParams(beacon: Record<string, any>): Record<strin
   };
 }
 
-export function sanitizeEventUrlParams(beacon: Record<string, any>): Record<string, any> {
+export function sanitizeResourceTimingUrl(beacon: Record<string, any>): Record<string, any> {
   const isResourceTiming =
     beacon.type === 'event' && beacon.payload?.name === 'faro.performance.resource';
   if (!isResourceTiming || !beacon.payload.attributes?.name) return beacon;

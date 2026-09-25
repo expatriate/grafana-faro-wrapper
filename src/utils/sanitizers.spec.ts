@@ -1,4 +1,4 @@
-import { sanitizeEventUrlParams, sanitizePageUrlParams, sanitizeUrl } from './sanitizers.ts';
+import { sanitizeResourceTimingUrl, sanitizePageUrl, sanitizeUrl } from './sanitizers.ts';
 
 describe('sanitizers', () => {
   describe('sanitizeUrl', () => {
@@ -26,7 +26,7 @@ describe('sanitizers', () => {
       expect(out).toBe('example.com/a/:id/details');
     });
 
-    test('replaces long hex segment with :id', () => {
+    test('replaces a UUID with a long alphanumeric suffix with :id', () => {
       const input =
         'https://gc.scr.example.com/7D8B79A2-8974-4D7B-A76A-F4F29624C06BG6MNX6kL4JtpdxZ5jiaI0mN7eaEgCFoWTvXyQdZxbdDUiNG1HJQmKbln2UffnDXQhKwYxkpEXS0j4nr6b990yg/init';
       const out = sanitizeUrl(input);
@@ -51,25 +51,25 @@ describe('sanitizers', () => {
     });
   });
 
-  describe('sanitizePageUrlParams', () => {
+  describe('sanitizePageUrl', () => {
     test('sanitizes beacon.meta.page.url when present', () => {
       const beacon: any = {
         meta: { page: { url: 'https://example.com/users/1234567?x=1' } },
         other: 1,
       };
-      const out = sanitizePageUrlParams(beacon);
+      const out = sanitizePageUrl(beacon);
       expect(out.meta.page.url).toBe('example.com/users/:id');
       expect(out.other).toBe(1);
     });
 
     test('no-op when meta.page.url is missing', () => {
       const beacon: any = { meta: {}, foo: 'bar' };
-      const out = sanitizePageUrlParams(beacon);
+      const out = sanitizePageUrl(beacon);
       expect(out).toEqual(beacon);
     });
   });
 
-  describe('sanitizeEventUrlParams', () => {
+  describe('sanitizeResourceTimingUrl', () => {
     test('sanitizes payload.attributes.name for faro.performance.resource events', () => {
       const beacon: any = {
         type: 'event',
@@ -78,7 +78,7 @@ describe('sanitizers', () => {
           attributes: { name: 'https://cdn.example.com/assets/1234567.png' },
         },
       };
-      const out = sanitizeEventUrlParams(beacon);
+      const out = sanitizeResourceTimingUrl(beacon);
       expect(out.payload.attributes.name).toBe('cdn.example.com/assets/:id.png');
     });
 
@@ -90,7 +90,7 @@ describe('sanitizers', () => {
           attributes: { name: 'https://example.com/1234567' },
         },
       };
-      const out = sanitizeEventUrlParams(beacon);
+      const out = sanitizeResourceTimingUrl(beacon);
       expect(out.payload.attributes.name).toBe('https://example.com/1234567');
     });
 
@@ -99,7 +99,7 @@ describe('sanitizers', () => {
         type: 'measurement',
         payload: { name: 'faro.performance.resource', attributes: { name: 'https://a/1' } },
       };
-      const out = sanitizeEventUrlParams(beacon);
+      const out = sanitizeResourceTimingUrl(beacon);
       expect(out).toEqual(beacon);
     });
   });

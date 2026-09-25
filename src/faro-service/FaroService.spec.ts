@@ -61,7 +61,7 @@ describe('FaroService', () => {
     warnSpy.mockRestore();
   });
 
-  test('beforeSend wrapper санитизирует URL и вызывает пользовательский beforeSend', () => {
+  test('beforeSend wrapper sanitizes the page URL and then calls the user beforeSend', () => {
     const svc = new FaroService();
     const userBeforeSend = jest.fn((b: any) => ({ ...b, fromUser: true }));
 
@@ -145,7 +145,7 @@ describe('FaroService', () => {
     });
   });
 
-  test('destroy сбрасывает состояние', () => {
+  test('destroy leaves the service uninitialized', () => {
     const svc = new FaroService();
     svc.init({ faroUrl: 'u', faroKey: 'k' } as any);
     expect(svc.isInitialized).toBe(true);

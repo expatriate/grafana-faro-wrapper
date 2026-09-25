@@ -9,7 +9,8 @@ import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
 import { parseMetricLabels } from '../metrics-service/helpers/parseMetricLabels.ts';
 import { MEASUREMENT_KEYS } from '../metrics-service/types.ts';
 import { toLogfmt } from '../utils/logfmt.ts';
-import { sanitizeEventUrlParams, sanitizePageUrlParams } from '../utils/sanitizers.ts';
+import { LOG_PREFIX } from '../utils/logPrefix.ts';
+import { sanitizeResourceTimingUrl, sanitizePageUrl } from '../utils/sanitizers.ts';
 
 export interface FaroConfig {
   faroUrl: string;
@@ -23,8 +24,8 @@ type OtlpTransform = NonNullable<
 >;
 
 const DEFAULT_SANITIZERS: Sanitizer[] = [
-  sanitizePageUrlParams,
-  sanitizeEventUrlParams,
+  sanitizePageUrl,
+  sanitizeResourceTimingUrl,
   parseMetricLabels,
 ];
 
@@ -64,7 +65,7 @@ export class FaroService {
     ...rest
   }: FaroConfig & BrowserConfig & { routerAdapter?: Instrumentation }): Faro {
     if (this.instance) {
-      console.warn('[Faro-react-wrapper] FaroService already initialized');
+      console.warn(`${LOG_PREFIX} FaroService already initialized`);
       return this.instance;
     }
 
@@ -102,7 +103,7 @@ export class FaroService {
     });
 
     if (!faro) {
-      throw new Error('[Faro-react-wrapper] Faro is already registered outside FaroService');
+      throw new Error(`${LOG_PREFIX} Faro is already registered outside FaroService`);
     }
 
     this.registered = { faro, identity };
@@ -121,7 +122,7 @@ export class FaroService {
 
   getInstance(): Faro {
     if (!this.instance) {
-      throw new Error('Faro not initialized. Call init() first.');
+      throw new Error(`${LOG_PREFIX} Faro not initialized. Call init() first.`);
     }
     return this.instance;
   }
@@ -140,7 +141,7 @@ export class FaroService {
     );
     if (changed.length > 0) {
       console.warn(
-        `[Faro-react-wrapper] Faro cannot be re-initialized, changed options are ignored: ${changed.join(', ')}`,
+        `${LOG_PREFIX} Faro cannot be re-initialized, changed options are ignored: ${changed.join(', ')}`,
       );
     }
   }

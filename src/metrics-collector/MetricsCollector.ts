@@ -1,29 +1,36 @@
+import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { MetricFn, ReadyToCheckConditionFn } from './types.ts';
 
-const DEFAULT_METRIC_STEP_CHECK_INTERVAL = 100;
+const STEP_CHECK_INTERVAL_MS = 100;
+
+type RunState = 'idle' | 'running' | 'paused' | 'finishing' | 'done';
+
+type Outcome = 'success' | 'fail';
 
 export interface MetricsCollectorConfig<T extends string = string> {
   failTime?: number;
   steps: T[];
   log?: boolean;
-  onSuccess: (params: MetricsCollectorCallback) => void;
-  onFail: (params: MetricsCollectorCallback) => void;
+  onSuccess: (params: MetricsCollectorCallback<T>) => void;
+  onFail: (params: MetricsCollectorCallback<T>) => void;
 }
 
-export interface MetricsCollectorCallback {
+export interface MetricsCollectorCallback<T extends string = string> {
   timestamp: number;
   duration: number;
-  steps: { [k: string]: boolean };
+  steps: Record<T, boolean>;
 }
 
 export class MetricsCollector<T extends string = string> {
-  private metrics = new Map<T, { fn: MetricFn; conditionFn?: ReadyToCheckConditionFn }>();
+  private stepChecks = new Map<T, { fn: MetricFn; conditionFn?: ReadyToCheckConditionFn }>();
 
-  private metricsResults = new Map<T, boolean>();
+  private stepResults = new Map<T, boolean>();
 
   private checksInProgress = new Set<T>();
 
   private cycle = 0;
+
+  private state: RunState = 'idle';
 
   private readonly failTime?: number;
 
@@ -31,13 +38,13 @@ export class MetricsCollector<T extends string = string> {
 
   private readonly log: boolean;
 
-  private readonly onFail: (params: MetricsCollectorCallback) => void;
+  private readonly onFail: (params: MetricsCollectorCallback<T>) => void;
 
-  private readonly onSuccess: (params: MetricsCollectorCallback) => void;
+  private readonly onSuccess: (params: MetricsCollectorCallback<T>) => void;
 
-  private metricTimeRunner?: ReturnType<typeof setTimeout>;
+  private failTimer?: ReturnType<typeof setTimeout>;
 
-  private metricStepsCheckInterval?: ReturnType<typeof setInterval>;
+  private checkInterval?: ReturnType<typeof setInterval>;
 
   private pauseStartTime?: number;
 
@@ -46,12 +53,6 @@ export class MetricsCollector<T extends string = string> {
   private startTime?: number;
 
   private finishTime?: number;
-
-  private isRunning = false;
-
-  private isDone = false;
-
-  private isPaused = false;
 
   constructor({ failTime, steps, onFail, onSuccess, log = false }: MetricsCollectorConfig<T>) {
     this.failTime = failTime;
@@ -62,16 +63,11 @@ export class MetricsCollector<T extends string = string> {
   }
 
   start() {
-    if (this.isRunning || this.isDone) {
+    if (this.state !== 'idle') {
       return;
     }
 
-    this.isRunning = true;
-    this.isPaused = false;
-    this.pausedDuration = 0;
-    this.pauseStartTime = undefined;
-    this.finishTime = undefined;
-
+    this.state = 'running';
     this.debug('start');
 
     this.startTime = performance.now();
@@ -80,11 +76,11 @@ export class MetricsCollector<T extends string = string> {
   }
 
   pause() {
-    if (!this.isRunning || this.isPaused || this.isDone) {
+    if (this.state !== 'running') {
       return;
     }
 
-    this.isPaused = true;
+    this.state = 'paused';
     this.pauseStartTime = performance.now();
     this.clearTimers();
 
@@ -92,20 +88,17 @@ export class MetricsCollector<T extends string = string> {
   }
 
   resume() {
-    if (!this.isRunning || !this.isPaused || this.isDone) {
+    if (this.state !== 'paused') {
       return;
     }
 
-    this.isPaused = false;
-
-    if (this.pauseStartTime !== undefined) {
-      this.pausedDuration += performance.now() - this.pauseStartTime;
-      this.pauseStartTime = undefined;
-    }
+    this.state = 'running';
+    this.pausedDuration += performance.now() - this.pauseStartTime!;
+    this.pauseStartTime = undefined;
 
     this.debug('resume');
 
-    this.checkMetricsResults();
+    this.finishIfAllStepsChecked();
     this.checkSteps();
     this.scheduleTimers();
   }
@@ -113,14 +106,14 @@ export class MetricsCollector<T extends string = string> {
   getStatus() {
     const runningTime = this.activeElapsed();
     return {
-      isRunning: this.isRunning,
-      isDone: this.isDone,
-      isPaused: this.isPaused,
+      isRunning: this.state === 'running' || this.state === 'paused' || this.state === 'finishing',
+      isDone: this.isFinished(),
+      isPaused: this.state === 'paused',
       runningTime,
       pausedDuration: this.pausedDuration,
-      registeredMetrics: Array.from(this.metrics.keys()),
-      completedMetrics: Array.from(this.metricsResults.entries()),
-      pendingMetrics: this.steps.filter((step) => !this.metricsResults.has(step)),
+      registeredMetrics: Array.from(this.stepChecks.keys()),
+      completedMetrics: Array.from(this.stepResults.entries()),
+      pendingMetrics: this.steps.filter((step) => !this.stepResults.has(step)),
       remainingTime:
         this.failTime && this.startTime !== undefined
           ? Math.max(0, this.failTime - runningTime)
@@ -129,12 +122,12 @@ export class MetricsCollector<T extends string = string> {
   }
 
   addMetricStep(key: T, fn: MetricFn, conditionFn?: ReadyToCheckConditionFn): this {
-    if (this.isDone || !this.steps.includes(key) || this.metrics.has(key)) {
+    if (this.isFinished() || !this.steps.includes(key) || this.stepChecks.has(key)) {
       return this;
     }
 
     this.start();
-    this.metrics.set(key, { fn, conditionFn });
+    this.stepChecks.set(key, { fn, conditionFn });
 
     this.debug('addMetricStep', key);
 
@@ -145,18 +138,20 @@ export class MetricsCollector<T extends string = string> {
     this.clearTimers();
 
     this.cycle++;
-    this.metrics.clear();
-    this.metricsResults.clear();
+    this.state = 'idle';
+    this.stepChecks.clear();
+    this.stepResults.clear();
     this.checksInProgress.clear();
-    this.isDone = false;
-    this.isRunning = false;
-    this.isPaused = false;
     this.startTime = undefined;
     this.finishTime = undefined;
     this.pausedDuration = 0;
     this.pauseStartTime = undefined;
 
     this.debug('reset');
+  }
+
+  private isFinished() {
+    return this.state === 'finishing' || this.state === 'done';
   }
 
   private activeElapsed() {
@@ -168,10 +163,7 @@ export class MetricsCollector<T extends string = string> {
   }
 
   private scheduleTimers() {
-    this.metricStepsCheckInterval = setInterval(
-      () => this.checkSteps(),
-      DEFAULT_METRIC_STEP_CHECK_INTERVAL,
-    );
+    this.checkInterval = setInterval(() => this.checkSteps(), STEP_CHECK_INTERVAL_MS);
 
     if (!this.failTime) {
       return;
@@ -179,27 +171,27 @@ export class MetricsCollector<T extends string = string> {
 
     const remaining = this.failTime - this.activeElapsed();
     if (remaining > 0) {
-      this.metricTimeRunner = setTimeout(() => this.finish(false), remaining);
+      this.failTimer = setTimeout(() => this.finish('fail'), remaining);
     } else {
-      this.finish(false);
+      this.finish('fail');
     }
   }
 
   private clearTimers() {
-    clearTimeout(this.metricTimeRunner);
-    clearInterval(this.metricStepsCheckInterval);
-    this.metricTimeRunner = undefined;
-    this.metricStepsCheckInterval = undefined;
+    clearTimeout(this.failTimer);
+    clearInterval(this.checkInterval);
+    this.failTimer = undefined;
+    this.checkInterval = undefined;
   }
 
   private async checkSteps() {
-    if (this.isPaused) {
+    if (this.state === 'paused') {
       return;
     }
 
     const cycle = this.cycle;
-    const pendingChecks = Array.from(this.metrics.entries())
-      .filter(([key]) => !this.metricsResults.has(key) && !this.checksInProgress.has(key))
+    const pendingChecks = Array.from(this.stepChecks.entries())
+      .filter(([key]) => !this.stepResults.has(key) && !this.checksInProgress.has(key))
       .map(async ([key, { fn, conditionFn }]) => {
         const check = this.checkIfReady(key, fn, conditionFn);
         if (!check) {
@@ -211,7 +203,7 @@ export class MetricsCollector<T extends string = string> {
           return;
         }
         this.checksInProgress.delete(key);
-        this.metricsResults.set(key, passed);
+        this.stepResults.set(key, passed);
       });
 
     if (pendingChecks.length === 0) {
@@ -220,8 +212,8 @@ export class MetricsCollector<T extends string = string> {
 
     await Promise.all(pendingChecks);
 
-    this.debug('checkSteps:results', this.metricsResults);
-    this.checkMetricsResults();
+    this.debug('checkSteps:results', this.stepResults);
+    this.finishIfAllStepsChecked();
   }
 
   private checkIfReady(
@@ -248,48 +240,44 @@ export class MetricsCollector<T extends string = string> {
     }
   }
 
-  private checkMetricsResults() {
-    if (this.isDone || this.isPaused) {
+  private finishIfAllStepsChecked() {
+    if (this.state !== 'running') {
       return;
     }
 
-    if (this.steps.every((step) => this.metricsResults.has(step))) {
-      this.finish(this.steps.every((step) => this.metricsResults.get(step) === true));
+    if (this.steps.every((step) => this.stepResults.has(step))) {
+      const allPassed = this.steps.every((step) => this.stepResults.get(step) === true);
+      this.finish(allPassed ? 'success' : 'fail');
     }
   }
 
-  private finish(success: boolean) {
-    if (this.isDone) {
+  private finish(outcome: Outcome) {
+    if (this.isFinished()) {
       return;
     }
 
-    this.isDone = true;
+    this.state = 'finishing';
     const cycle = this.cycle;
 
     queueMicrotask(() => {
       if (cycle !== this.cycle) {
         return;
       }
-      this.isRunning = false;
+      this.state = 'done';
       this.finishTime = performance.now();
       this.clearTimers();
 
-      const result: MetricsCollectorCallback = {
+      const result: MetricsCollectorCallback<T> = {
         timestamp: Date.now(),
         duration: Math.round(this.activeElapsed()),
         steps: Object.fromEntries(
-          this.steps.map((step) => [step, this.metricsResults.get(step) || false]),
-        ),
+          this.steps.map((step) => [step, this.stepResults.get(step) || false]),
+        ) as Record<T, boolean>,
       };
 
-      this.debug(
-        'finish',
-        success ? 'Success' : 'Fail',
-        new Date().toLocaleTimeString(),
-        result.duration,
-      );
+      this.debug('finish', outcome, new Date().toLocaleTimeString(), result.duration);
 
-      if (success) {
+      if (outcome === 'success') {
         this.onSuccess(result);
       } else {
         this.onFail(result);
@@ -299,7 +287,7 @@ export class MetricsCollector<T extends string = string> {
 
   private debug(event: string, ...details: unknown[]) {
     if (this.log) {
-      console.info(`[SLO-metrics:${event}]`, ...details);
+      console.info(LOG_PREFIX, `slo:${event}`, ...details);
     }
   }
 }

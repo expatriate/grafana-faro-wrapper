@@ -1,5 +1,6 @@
 import { FaroService } from '../faro-service/FaroService.ts';
 import { safeNumberConversion } from '../utils/helpers.ts';
+import { LOG_PREFIX } from '../utils/logPrefix.ts';
 import { constructMetricContext } from './helpers/constructMetricContext.ts';
 import { CustomMetricBase } from './types.ts';
 
@@ -23,7 +24,7 @@ export class MetricsService {
       );
     } catch (e) {
       console.warn(
-        '[Faro-react-wrapper] Failed to send metric:',
+        `${LOG_PREFIX} Failed to send metric:`,
         e instanceof Error ? e.message : 'Unknown error',
       );
     }

@@ -1,5 +1,6 @@
 import { getAmount } from './getAmount';
 
 export function checkGTEAmount(selector: string, amount: number): boolean {
-  return getAmount(selector) >= amount;
+  const minimum = Number(amount);
+  return Number.isFinite(minimum) && getAmount(selector) >= minimum;
 }

@@ -8,6 +8,7 @@ import { OUTPUTS } from '../bundles.config.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const port = Number(process.argv[2] ?? 5179);
+const requestsByUrl = {};
 
 function png(width, height) {
   const chunk = (kind, data) => {
@@ -57,11 +58,14 @@ const FILES = {
 
 createServer((request, response) => {
   const path = new URL(request.url, 'http://localhost').pathname;
+  requestsByUrl[request.url] = (requestsByUrl[request.url] ?? 0) + 1;
   const reply = (status, type, body) => {
     response.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
     response.end(body);
   };
-  if (path.startsWith('/img/slow')) {
+  if (path === '/requests') {
+    reply(200, 'application/json', JSON.stringify(requestsByUrl));
+  } else if (path.startsWith('/img/slow')) {
     setTimeout(() => reply(200, 'image/png', png(4, 3)), 2000);
   } else if (IMAGES[path]) {
     reply(200, ...IMAGES[path]);

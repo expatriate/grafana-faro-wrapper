@@ -34,3 +34,12 @@ test('fails after the timeout when the image never loads', async () => {
 
   await expect(result).resolves.toBe(false);
 });
+
+test('reuses one image per address, so retrying a broken one sends no new request', async () => {
+  const createImage = stubImageLoading({ 'retried-broken.png': 'error' });
+
+  await expect(loadImage('retried-broken.png')).resolves.toBe(false);
+  await expect(loadImage('retried-broken.png')).resolves.toBe(false);
+
+  expect(createImage).toHaveBeenCalledTimes(1);
+});

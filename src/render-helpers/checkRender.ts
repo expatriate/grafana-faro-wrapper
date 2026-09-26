@@ -1,5 +1,6 @@
 import { queryOne } from '../utils/safeQuery';
 
 export function checkRender(selectors: string | string[]): boolean {
-  return [selectors].flat().every((selector) => queryOne(selector) !== null);
+  const list = [selectors].flat();
+  return list.length > 0 && list.every((selector) => queryOne(selector) !== null);
 }

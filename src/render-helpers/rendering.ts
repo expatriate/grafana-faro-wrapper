@@ -23,7 +23,7 @@ function textWithoutLayout(element: Element): string {
 }
 
 export function renderedText(element: Element): string {
-  if (!isRendered(element)) {
+  if (!element.textContent?.trim() || !isRendered(element)) {
     return '';
   }
   const text = hasLayoutEngine(element)

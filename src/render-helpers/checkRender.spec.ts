@@ -18,3 +18,9 @@ test('an invalid selector fails the check with one warning instead of throwing',
   expect(warn).toHaveBeenCalledTimes(1);
   warn.mockRestore();
 });
+
+test('an empty list of selectors does not pass', () => {
+  document.body.innerHTML = '<div class="tariff"></div>';
+
+  expect(checkRender([])).toBe(false);
+});

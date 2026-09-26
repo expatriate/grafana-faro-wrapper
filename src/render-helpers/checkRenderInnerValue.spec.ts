@@ -49,15 +49,21 @@ test('does not count a block that is hidden itself', () => {
 });
 
 test('passes when any of the matching blocks shows text, as with desktop and mobile variants', () => {
-  document.body.innerHTML = '<div class="price mobile"></div><div class="price desktop"></div>';
+  document.body.innerHTML = '<div class="price mobile">9$</div><div class="price desktop"></div>';
   const [mobile, desktop] = Array.from(document.querySelectorAll('.price'));
   renderAs(mobile, { text: '9$', rendered: false });
   renderAs(desktop, { text: '', rendered: true });
   expect(checkRenderInnerValue('.price')).toBe(false);
 
-  document.body.innerHTML = '<div class="price mobile"></div><div class="price desktop"></div>';
+  document.body.innerHTML = '<div class="price mobile"></div><div class="price desktop">9$</div>';
   const [hiddenEmpty, visibleFilled] = Array.from(document.querySelectorAll('.price'));
   renderAs(hiddenEmpty, { text: '', rendered: false });
   renderAs(visibleFilled, { text: '9$', rendered: true });
   expect(checkRenderInnerValue('.price')).toBe(true);
+});
+
+test('an empty list of selectors does not pass', () => {
+  document.body.innerHTML = '<div class="tariff">Pro</div>';
+
+  expect(checkRenderInnerValue([])).toBe(false);
 });

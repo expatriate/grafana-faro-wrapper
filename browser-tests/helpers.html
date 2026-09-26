@@ -491,6 +491,25 @@
         );
         check('checkEnabledButtonState', 'duplicates-hidden-disabled', pressable('.b-dup'), true);
 
+        const retried = `/img/missing.png?retried-${Math.random().toString(36).slice(2)}`;
+        add('bg-retried-in-slo', '<div class="bg"></div>');
+        document.querySelector(sel('bg-retried-in-slo')).style.backgroundImage = `url(${retried})`;
+        new H.FaroService().trackSlo({
+          name: 'broken_background',
+          failTime: 1500,
+          pauseWhenHidden: false,
+          steps: { logo: () => H.asyncCheckBackgroundImagesIsDisplayed(sel('bg-retried-in-slo')) },
+        });
+        await new Promise((done) => setTimeout(done, 1800));
+        const requests = (await (await fetch('/requests')).json())[retried] ?? 0;
+        check(
+          'trackSlo',
+          'broken-background-requests-at-most-two',
+          requests <= 2,
+          true,
+          `запросов: ${requests}`,
+        );
+
         await Promise.all([...asyncImages, ...asyncBackgrounds, ...loads, ...dynamic]);
 
         window.helperResults = cases;

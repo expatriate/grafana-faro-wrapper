@@ -44,3 +44,7 @@ test('picks the image-set candidate the screen density would show', () => {
   expect(onScreen(3)).toBe('https://a.com/2x.png');
   Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
 });
+
+test('returns null instead of throwing for something that is not an element', () => {
+  expect(extractBackgroundUrl(null as unknown as Element)).toBeNull();
+});

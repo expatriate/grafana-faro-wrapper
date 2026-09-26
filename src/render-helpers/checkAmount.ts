@@ -1,5 +1,6 @@
 import { getAmount } from './getAmount';
 
 export function checkAmount(selector: string, amount: number): boolean {
-  return getAmount(selector) === amount;
+  const expected = Number(amount);
+  return Number.isFinite(expected) && getAmount(selector) === expected;
 }

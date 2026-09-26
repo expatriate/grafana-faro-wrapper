@@ -43,6 +43,9 @@ function urlForScreenDensity(imageSet: string): string | null {
 }
 
 export function extractBackgroundUrl(element: Element): string | null {
+  if (!(element instanceof Element)) {
+    return null;
+  }
   const layer = topLevelLayers(getComputedStyle(element).backgroundImage).find((candidate) =>
     candidate.includes('url('),
   );

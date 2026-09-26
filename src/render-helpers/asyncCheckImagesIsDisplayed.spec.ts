@@ -13,18 +13,12 @@ test('passes when every image decodes with pixels, SVG without intrinsic size in
   await expect(asyncCheckImagesIsDisplayed('img')).resolves.toBe(true);
 });
 
-test('fails when an image cannot be decoded or decodes empty', async () => {
-  const [logo, broken, empty] = renderImages(
-    'https://a.com/logo.png',
-    'https://a.com/broken.png',
-    'https://a.com/empty.png',
-  );
+test('fails when an image cannot be decoded', async () => {
+  const [logo, broken] = renderImages('https://a.com/logo.png', 'https://a.com/broken.png');
   stubDecodedImage(logo, { naturalWidth: 120 });
   stubDecodedImage(broken, { decode: Promise.reject(new Error('EncodingError')) });
-  stubDecodedImage(empty, { naturalWidth: 0 });
 
   await expect(asyncCheckImagesIsDisplayed('[src*="broken"]')).resolves.toBe(false);
-  await expect(asyncCheckImagesIsDisplayed('[src*="empty"]')).resolves.toBe(false);
   await expect(asyncCheckImagesIsDisplayed('img')).resolves.toBe(false);
 });
 
@@ -62,4 +56,46 @@ test('passes for an already loaded image even when decode never settles, as in a
   stubDecodedImage(logo, { naturalWidth: 120, complete: true, decode: new Promise(() => {}) });
 
   await expect(asyncCheckImagesIsDisplayed('img', 500)).resolves.toBe(true);
+});
+
+function stubLoadingImage(image: HTMLImageElement, previousWidth = 0) {
+  const state = { complete: false, naturalWidth: previousWidth, failed: false };
+  Object.defineProperty(image, 'complete', { get: () => state.complete });
+  Object.defineProperty(image, 'naturalWidth', { get: () => state.naturalWidth });
+  image.decode = () =>
+    state.failed ? Promise.reject(new Error('EncodingError')) : Promise.resolve();
+  return (outcome: 'load' | 'error', naturalWidth = 0) => {
+    state.complete = true;
+    state.naturalWidth = naturalWidth;
+    state.failed = outcome === 'error';
+    image.dispatchEvent(new Event(outcome));
+  };
+}
+
+test('waits for an image whose src just changed instead of trusting the previous picture', async () => {
+  const [photo] = renderImages('https://a.com/missing.png');
+  const finishLoading = stubLoadingImage(photo, 120);
+
+  const result = asyncCheckImagesIsDisplayed('img');
+  finishLoading('error');
+
+  await expect(result).resolves.toBe(false);
+});
+
+test('waits for a srcset image the browser has not picked a source for yet', async () => {
+  document.body.innerHTML =
+    '<img srcset="https://a.com/logo.png 1x, https://a.com/logo@2x.png 2x">';
+  const finishLoading = stubLoadingImage(document.querySelector('img')!);
+
+  const result = asyncCheckImagesIsDisplayed('img');
+  finishLoading('load', 120);
+
+  await expect(result).resolves.toBe(true);
+});
+
+test('accepts a loaded SVG without intrinsic size whatever its URL looks like', async () => {
+  const [logo] = renderImages('https://a.com/logo?format=svg');
+  stubDecodedImage(logo, { naturalWidth: 0 });
+
+  await expect(asyncCheckImagesIsDisplayed('img')).resolves.toBe(true);
 });

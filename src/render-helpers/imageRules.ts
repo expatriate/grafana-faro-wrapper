@@ -12,6 +12,13 @@ export function hasVisiblePixels(image: HTMLImageElement, src: string): boolean 
   return image.naturalWidth > 0 || isSvgSource(src);
 }
 
+export function hasSource(image: HTMLImageElement): boolean {
+  return (
+    Boolean(image.getAttribute('src') || image.getAttribute('srcset')) ||
+    image.parentElement instanceof HTMLPictureElement
+  );
+}
+
 export function imagesOf(element: Element): HTMLImageElement[] {
   return element instanceof HTMLImageElement
     ? [element]
@@ -29,15 +36,38 @@ export async function allDisplayed<T>(
   return results.every(Boolean);
 }
 
-export async function isVisibleOnceLoaded(
-  image: HTMLImageElement,
-  src: string,
-  load: () => Promise<void>,
-  timeoutMs: number,
-): Promise<boolean> {
+function settled(image: HTMLImageElement, timeoutMs: number): Promise<void> {
+  if (image.complete) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const stopListening = () => {
+      clearTimeout(timer);
+      image.removeEventListener('load', onSettled);
+      image.removeEventListener('error', onSettled);
+    };
+    const onSettled = () => {
+      stopListening();
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      stopListening();
+      reject(new Error(`timed out after ${timeoutMs} ms`));
+    }, timeoutMs);
+    image.addEventListener('load', onSettled);
+    image.addEventListener('error', onSettled);
+  });
+}
+
+export async function isImageLoaded(image: HTMLImageElement, timeoutMs: number): Promise<boolean> {
+  const startedAt = Date.now();
   try {
-    await withTimeout(load(), timeoutMs);
-    return hasVisiblePixels(image, src);
+    await settled(image, timeoutMs);
+    if (image.naturalWidth > 0) {
+      return true;
+    }
+    await withTimeout(image.decode(), Math.max(0, timeoutMs - (Date.now() - startedAt)));
+    return true;
   } catch {
     return false;
   }

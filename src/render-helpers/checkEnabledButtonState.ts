@@ -1,11 +1,6 @@
-import { queryOne } from '../utils/safeQuery';
+import { queryAll } from '../utils/safeQuery';
+import { isPressable } from './rendering';
 
 export function checkEnabledButtonState(selector: string): boolean {
-  const button = queryOne(selector);
-  return (
-    button !== null &&
-    !button.matches(':disabled') &&
-    button.getAttribute('aria-disabled') !== 'true' &&
-    !button.classList.contains('disabled')
-  );
+  return queryAll(selector).some(isPressable);
 }

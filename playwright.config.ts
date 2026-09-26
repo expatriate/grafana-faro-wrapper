@@ -16,5 +16,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium-retina', use: { ...devices['Desktop Chrome HiDPI'] } },
+    { name: 'firefox-retina', use: { ...devices['Desktop Firefox HiDPI'] } },
+    { name: 'webkit-retina', use: { ...devices['Desktop Safari'], deviceScaleFactor: 2 } },
   ],
 });

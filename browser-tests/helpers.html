@@ -24,7 +24,70 @@
       const PNG_DATA =
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+      const RETINA = devicePixelRatio >= 2;
+      const OTHER_ORIGIN = location.origin.replace('127.0.0.1', 'localhost');
+      customElements.define(
+        'shadow-logo',
+        class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: 'open' }).innerHTML = '<img src="/img/ok.png?shadow">';
+          }
+        },
+      );
+
       const imageCases = [
+        ['img-html-200', '<img src="/img/html-page.png">', false, false],
+        [
+          'img-html-200-svg',
+          '<img src="/img/html-page.svg">',
+          true,
+          false,
+          'README: синхронная не отличает битый SVG',
+        ],
+        [
+          'img-wrong-mime-svg',
+          '<img src="/img/wrong-mime.svg">',
+          true,
+          false,
+          'README: синхронная не отличает битый SVG',
+        ],
+        ['img-percent-svg', '<img src="/img/percent.svg">', true, true],
+        ['img-zero-size-svg', '<img src="/img/zero.svg">', true, true],
+        ['img-cross-origin', `<img src="${OTHER_ORIGIN}/img/ok.png?xo">`, true, true],
+        [
+          'img-crossorigin-without-cors',
+          `<img crossorigin="anonymous" src="${OTHER_ORIGIN}/img/ok.png?cors">`,
+          false,
+          false,
+        ],
+        [
+          'img-srcset-density',
+          '<img srcset="/img/missing.png?dpr 1x, /img/ok.png?dpr 2x">',
+          RETINA,
+          RETINA,
+        ],
+        [
+          'img-in-shadow-dom',
+          '<shadow-logo></shadow-logo>',
+          false,
+          false,
+          'README: Shadow DOM не проверяется',
+        ],
+        [
+          'img-inline-svg-only',
+          '<svg width="10" height="10"><rect width="10" height="10"/></svg>',
+          false,
+          false,
+          'README: обёртка без <img>',
+        ],
+        ['img-swap-to-broken', '<img src="/img/ok.png?swapbroken">', false, false],
+        [
+          'img-swap-to-slow',
+          '<img src="/img/ok.png?swapslow">',
+          false,
+          true,
+          'синхронная — сразу после смены src',
+        ],
         ['img-ok', '<img src="/img/ok.png">', true, true],
         ['img-404', '<img src="/img/missing.png">', false, false],
         ['img-corrupt', '<img src="/img/corrupt.png">', false, false],
@@ -76,6 +139,24 @@
       ];
 
       const backgroundCases = [
+        [
+          'bg-data-svg-single-quotes',
+          `background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect fill='url(%23g)' width='10' height='10'/></svg>")`,
+          true,
+        ],
+        [
+          'bg-data-svg-double-quotes',
+          `background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>')`,
+          true,
+        ],
+        [
+          'bg-image-set-density',
+          'background-image:image-set(url(/img/missing.png?set) 1x, url(/img/ok.png?set) 2x)',
+          RETINA,
+        ],
+        ['bg-shorthand', 'background:#fff url(/img/ok.png?short) no-repeat', true],
+        ['bg-html-200', 'background-image:url(/img/html-page.png?bg)', false],
+        ['bg-custom-property', '--logo:url(/img/ok.png?var);background-image:var(--logo)', true],
         ['bg-ok', 'background-image:url(/img/ok.png)', true],
         ['bg-404', 'background-image:url(/img/missing.png)', false],
         ['bg-corrupt', 'background-image:url(/img/corrupt.png)', false],
@@ -151,6 +232,22 @@
   <input id="submit-disabled" type="submit" disabled>
   <a id="link-disabled" class="btn disabled" href="#">x</a>
   <ul id="list"><li></li><li></li><li></li></ul>
+  <div id="t-self-hidden" style="display:none">Pro</div>
+  <div id="t-hidden-attr" hidden>Pro</div>
+  <details><summary>s</summary><div id="t-details-closed">Pro</div></details>
+  <div id="t-visibility-hidden" style="visibility:hidden">Pro</div>
+  <div id="t-display-contents" style="display:contents">Pro</div>
+  <div id="t-opacity" style="opacity:0">Pro</div>
+  <div id="t-sr-only"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Loading…</span></div>
+  <div id="t-offscreen" style="position:absolute;left:-9999px">Pro</div>
+  <div class="t-dup-hidden-filled" style="display:none">Pro</div><div class="t-dup-hidden-filled"></div>
+  <div class="t-dup-hidden-empty" style="display:none"></div><div class="t-dup-hidden-empty">Pro</div>
+  <button id="b-hidden" style="display:none">x</button>
+  <div inert><button id="b-inert">x</button></div>
+  <button id="b-visibility" style="visibility:hidden">x</button>
+  <button id="b-pointer-none" style="pointer-events:none">x</button>
+  <fieldset disabled><legend><button id="b-legend">x</button></legend></fieldset>
+  <button class="b-dup" disabled style="display:none">x</button><button class="b-dup">x</button>
 `,
       );
 
@@ -161,7 +258,23 @@
       const early = imageCases.map(([id]) => [id, H.checkImagesIsDisplayed(sel(id))]);
 
       window.addEventListener('load', async () => {
+        add('img-srcset-fresh', '<img srcset="/img/slow.png?fresh 1x">');
+        const freshSrcset = H.asyncCheckImagesIsDisplayed(sel('img-srcset-fresh'), 5000);
         await new Promise((done) => setTimeout(done, 3000));
+        document.querySelector(sel('img-swap-to-broken')).src = '/img/missing.png?swapped';
+        document.querySelector(sel('img-swap-to-slow')).src = '/img/slow.png?swapped';
+        const dynamic = [
+          freshSrcset.then((actual) =>
+            check(
+              'asyncCheckImagesIsDisplayed',
+              'img-srcset-fresh',
+              actual,
+              true,
+              'вызов сразу после вставки',
+            ),
+          ),
+        ];
+        await new Promise((done) => setTimeout(done, 0));
 
         for (const [id, , syncExpected, asyncExpected, note] of imageCases) {
           check(
@@ -320,7 +433,65 @@
         check('checkGTEAmount', 'enough', H.checkGTEAmount('#list li', 3), true);
         check('checkGTEAmount', 'not-enough', H.checkGTEAmount('#list li', 4), false);
 
-        await Promise.all([...asyncImages, ...asyncBackgrounds, ...loads]);
+        const shows = (selector) => H.checkRenderInnerValue(selector);
+        check('checkRenderInnerValue', 'self-hidden', shows('#t-self-hidden'), false);
+        check('checkRenderInnerValue', 'hidden-attribute', shows('#t-hidden-attr'), false);
+        check('checkRenderInnerValue', 'details-closed', shows('#t-details-closed'), false);
+        check('checkRenderInnerValue', 'visibility-hidden', shows('#t-visibility-hidden'), false);
+        check('checkRenderInnerValue', 'display-contents', shows('#t-display-contents'), true);
+        check(
+          'checkRenderInnerValue',
+          'opacity-0',
+          shows('#t-opacity'),
+          true,
+          'README: визуально спрятанный текст засчитывается',
+        );
+        check(
+          'checkRenderInnerValue',
+          'sr-only',
+          shows('#t-sr-only'),
+          true,
+          'README: визуально спрятанный текст засчитывается',
+        );
+        check(
+          'checkRenderInnerValue',
+          'offscreen',
+          shows('#t-offscreen'),
+          true,
+          'README: визуально спрятанный текст засчитывается',
+        );
+        check(
+          'checkRenderInnerValue',
+          'duplicates-hidden-filled',
+          shows('.t-dup-hidden-filled'),
+          false,
+        );
+        check(
+          'checkRenderInnerValue',
+          'duplicates-hidden-empty',
+          shows('.t-dup-hidden-empty'),
+          true,
+        );
+
+        const pressable = (selector) => H.checkEnabledButtonState(selector);
+        check('checkEnabledButtonState', 'display-none', pressable('#b-hidden'), false);
+        check('checkEnabledButtonState', 'inert', pressable('#b-inert'), false);
+        check('checkEnabledButtonState', 'visibility-hidden', pressable('#b-visibility'), false);
+        check(
+          'checkEnabledButtonState',
+          'pointer-events-none',
+          pressable('#b-pointer-none'),
+          false,
+        );
+        check(
+          'checkEnabledButtonState',
+          'legend-of-disabled-fieldset',
+          pressable('#b-legend'),
+          true,
+        );
+        check('checkEnabledButtonState', 'duplicates-hidden-disabled', pressable('.b-dup'), true);
+
+        await Promise.all([...asyncImages, ...asyncBackgrounds, ...loads, ...dynamic]);
 
         window.helperResults = cases;
       });

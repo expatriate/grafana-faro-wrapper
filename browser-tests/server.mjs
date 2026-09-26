@@ -44,6 +44,11 @@ const IMAGES = {
   '/img/corrupt.svg': [SVG, '<svg xmlns="http://www.w3.org/2000/svg"><rect'],
   '/img/svg-without-extension': [SVG, svg('')],
   '/img/png-named.svg': ['image/png', png(4, 3)],
+  '/img/html-page.png': ['text/html', '<!doctype html><title>app</title>'],
+  '/img/html-page.svg': ['text/html', '<!doctype html><title>app</title>'],
+  '/img/wrong-mime.svg': ['text/plain', svg('width="10" height="10"')],
+  '/img/percent.svg': [SVG, svg('width="100%" height="100%"')],
+  '/img/zero.svg': [SVG, svg('width="0" height="0"')],
 };
 const FILES = {
   '/': ['text/html', resolve(here, 'helpers.html')],

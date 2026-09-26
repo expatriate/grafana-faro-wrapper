@@ -1,19 +1,13 @@
-import { allDisplayed, hasVisiblePixels, imageSource } from './imageRules';
-import { withTimeout } from './withTimeout';
+import { allDisplayed, imageSource, isVisibleOnceLoaded } from './imageRules';
 
 export const DEFAULT_IMAGE_TIMEOUT_MS = 10_000;
 
-async function waitForImage(image: HTMLImageElement, timeoutMs: number): Promise<boolean> {
+function waitForImage(image: HTMLImageElement, timeoutMs: number): Promise<boolean> {
   const src = imageSource(image);
   if (!src) {
-    return false;
+    return Promise.resolve(false);
   }
-  try {
-    await withTimeout(image.decode(), timeoutMs);
-    return hasVisiblePixels(image, src);
-  } catch {
-    return false;
-  }
+  return isVisibleOnceLoaded(image, src, () => image.decode(), timeoutMs);
 }
 
 export function waitForImages(images: HTMLImageElement[], timeoutMs: number): Promise<boolean> {

@@ -1,3 +1,5 @@
-export function checkRender(selectors: string[]): boolean {
-  return selectors.every((selector) => document.querySelector(selector) !== null);
+import { queryOne } from '../utils/safeQuery';
+
+export function checkRender(selectors: string | string[]): boolean {
+  return [selectors].flat().every((selector) => queryOne(selector) !== null);
 }

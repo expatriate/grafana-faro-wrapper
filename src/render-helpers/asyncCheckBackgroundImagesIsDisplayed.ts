@@ -1,11 +1,11 @@
+import { queryAll } from '../utils/safeQuery';
 import { extractBackgroundUrl } from './extractBackgroundUrl';
-import { allDisplayed } from './imageRules';
+import { allDisplayed, imagesOf } from './imageRules';
 import { loadImage } from './loadImage';
 import { DEFAULT_IMAGE_TIMEOUT_MS, waitForImages } from './waitForImages';
 
 function isElementImageDisplayed(element: Element, timeoutMs: number): Promise<boolean> {
-  const images =
-    element instanceof HTMLImageElement ? [element] : Array.from(element.querySelectorAll('img'));
+  const images = imagesOf(element);
   if (images.length > 0) {
     return waitForImages(images, timeoutMs);
   }
@@ -17,7 +17,5 @@ export function asyncCheckBackgroundImagesIsDisplayed(
   selector: string,
   timeoutMs = DEFAULT_IMAGE_TIMEOUT_MS,
 ): Promise<boolean> {
-  return allDisplayed(Array.from(document.querySelectorAll(selector)), (element) =>
-    isElementImageDisplayed(element, timeoutMs),
-  );
+  return allDisplayed(queryAll(selector), (element) => isElementImageDisplayed(element, timeoutMs));
 }

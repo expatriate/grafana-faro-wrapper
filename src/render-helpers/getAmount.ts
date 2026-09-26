@@ -1,3 +1,5 @@
+import { queryAll } from '../utils/safeQuery';
+
 export function getAmount(selector: string): number {
-  return document.querySelectorAll(selector).length;
+  return queryAll(selector).length;
 }

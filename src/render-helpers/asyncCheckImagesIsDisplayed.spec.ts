@@ -1,5 +1,5 @@
 import { asyncCheckImagesIsDisplayed } from './asyncCheckImagesIsDisplayed';
-import { renderImages, stubDecodedImage } from './imageStubs';
+import { renderImages, stubDecodedImage } from '../testing/imageStubs';
 
 afterEach(() => {
   jest.useRealTimers();
@@ -45,4 +45,13 @@ test('fails when there are no images or an image has no source', async () => {
 
   await expect(asyncCheckImagesIsDisplayed('.missing')).resolves.toBe(false);
   await expect(asyncCheckImagesIsDisplayed('img')).resolves.toBe(false);
+});
+
+test('checks images inside a wrapper and fails on a wrapper without images', async () => {
+  document.body.innerHTML =
+    '<picture data-slo="logo"><img src="https://a.com/logo.png"></picture><div data-slo="empty"></div>';
+  stubDecodedImage(document.querySelector('img')!, { naturalWidth: 120 });
+
+  await expect(asyncCheckImagesIsDisplayed('[data-slo="logo"]')).resolves.toBe(true);
+  await expect(asyncCheckImagesIsDisplayed('[data-slo]')).resolves.toBe(false);
 });

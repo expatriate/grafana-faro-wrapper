@@ -1,3 +1,5 @@
-export function checkRenderInnerValue(selectors: string[]): boolean {
-  return selectors.every((selector) => Boolean(document.querySelector(selector)?.innerHTML));
+import { queryOne } from '../utils/safeQuery';
+
+export function checkRenderInnerValue(selectors: string | string[]): boolean {
+  return [selectors].flat().every((selector) => Boolean(queryOne(selector)?.textContent?.trim()));
 }

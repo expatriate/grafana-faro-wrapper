@@ -1,4 +1,4 @@
-import { stubImageLoading } from './imageStubs';
+import { stubImageLoading } from '../testing/imageStubs';
 import { loadImage } from './loadImage';
 
 afterEach(() => {

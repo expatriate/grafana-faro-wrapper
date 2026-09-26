@@ -9,11 +9,12 @@ export function stubDecodedImage(
   image: HTMLImageElement,
   {
     naturalWidth = 0,
+    complete = true,
     decode = Promise.resolve(),
-  }: { naturalWidth?: number; decode?: Promise<void> },
+  }: { naturalWidth?: number; complete?: boolean; decode?: Promise<void> },
 ) {
   Object.defineProperty(image, 'naturalWidth', { value: naturalWidth });
-  Object.defineProperty(image, 'complete', { value: true });
+  Object.defineProperty(image, 'complete', { value: complete });
   image.decode = () => decode;
 }
 
@@ -23,7 +24,9 @@ export function stubImageLoading(outcomes: Record<string, ImageOutcome>) {
     Object.defineProperty(image, 'src', {
       set(src: string) {
         const outcome = outcomes[src] ?? 'error';
-        if (outcome === 'pending') return;
+        if (outcome === 'pending') {
+          return;
+        }
         queueMicrotask(() => {
           if (outcome === 'error') {
             image.onerror();

@@ -30,37 +30,50 @@
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
-  "unpkg": "dist/index.umd.js",
-  "jsdelivr": "dist/index.umd.js",
+  "unpkg": "dist/index.umd.full.js",
+  "jsdelivr": "dist/index.umd.full.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
+    "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },
   "sideEffects": false,
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "dev": "rollup -c -w",
     "build": "npm run clean && rollup -c",
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify:package": "node scripts/check-package-exports.mjs",
+    "verify:package": "node scripts/check-package-exports.mjs && node scripts/check-bundles.mjs && attw --pack . --profile node16 --entrypoints .",
     "verify:readme": "node scripts/check-readme-examples.mjs",
-    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run verify:package && npm run verify:readme",
-    "prepublishOnly": "npm run build && npm run verify:package"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run verify:package && npm run verify:readme",
+    "prepublishOnly": "npm run build && npm run verify:package",
+    "lint": "eslint .",
+    "verify:peers-floor": "node scripts/check-peers-floor.mjs"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@grafana/faro-core": "^2.12.1",
+    "@grafana/faro-react": "^2.12.1",
     "@grafana/faro-transport-otlp-http": "^2.12.1",
     "@grafana/faro-web-sdk": "^2.12.1",
     "@rollup/plugin-commonjs": "^29.0.3",
@@ -68,18 +81,25 @@
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",
+    "@types/react": "^19.3.0",
+    "acorn": "^8.18.0",
+    "eslint": "^10.11.0",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
     "jsdom": "^26.1.0",
     "prettier": "^3.9.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^7.18.4",
     "rollup": "^4.63.5",
     "rollup-plugin-dts": "^6.5.1",
     "ts-jest": "^29.4.14",
     "tslib": "^2.8.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1"
   },
   "peerDependencies": {
-    "@grafana/faro-transport-otlp-http": "^2.0.0",
-    "@grafana/faro-web-sdk": "^2.0.0"
+    "@grafana/faro-transport-otlp-http": "^2.0.2",
+    "@grafana/faro-web-sdk": "^2.0.2"
   }
 }

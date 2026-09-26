@@ -2,10 +2,14 @@ import { MeasurementEvent, TransportItem, TransportItemType } from '@grafana/far
 import { CUSTOM_MEASUREMENT_TYPE, MEASUREMENT_KEYS } from './keys';
 
 export function parseMetricLabels(beacon: TransportItem): TransportItem {
-  if (beacon.type !== TransportItemType.MEASUREMENT) return beacon;
+  if (beacon.type !== TransportItemType.MEASUREMENT) {
+    return beacon;
+  }
   const measurement = beacon.payload as MeasurementEvent | undefined;
   const labels = measurement?.context?.[MEASUREMENT_KEYS.LABELS];
-  if (measurement?.type !== CUSTOM_MEASUREMENT_TYPE || !labels) return beacon;
+  if (measurement?.type !== CUSTOM_MEASUREMENT_TYPE || !labels) {
+    return beacon;
+  }
 
   try {
     return {

@@ -210,7 +210,9 @@ describe('FaroService', () => {
     const svc = new FaroService();
     const faro: any = svc.init(config());
     svc.addSanitizer((beacon) => {
-      if (beacon.type === 'exception') throw new Error('boom');
+      if (beacon.type === 'exception') {
+        throw new Error('boom');
+      }
       return beacon;
     });
 

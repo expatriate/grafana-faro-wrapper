@@ -11,6 +11,9 @@ updates:
       # ts-jest поддерживает только TypeScript <7
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
+      # Новый major Faro — осознанный релиз обёртки с новым диапазоном peerDependencies
+      - dependency-name: '@grafana/*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:

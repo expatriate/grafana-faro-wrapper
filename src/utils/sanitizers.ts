@@ -38,7 +38,9 @@ const sanitizeIfUrl = (value: string) =>
 
 export function sanitizePageUrl(beacon: TransportItem): TransportItem {
   const url = beacon.meta.page?.url;
-  if (!url) return beacon;
+  if (!url) {
+    return beacon;
+  }
 
   return {
     ...beacon,
@@ -47,9 +49,13 @@ export function sanitizePageUrl(beacon: TransportItem): TransportItem {
 }
 
 export function sanitizeEventUrls(beacon: TransportItem): TransportItem {
-  if (beacon.type !== TransportItemType.EVENT) return beacon;
+  if (beacon.type !== TransportItemType.EVENT) {
+    return beacon;
+  }
   const event = beacon.payload as EventEvent;
-  if (!event.attributes) return beacon;
+  if (!event.attributes) {
+    return beacon;
+  }
 
   return {
     ...beacon,
@@ -63,9 +69,13 @@ export function sanitizeEventUrls(beacon: TransportItem): TransportItem {
 }
 
 export function sanitizeStacktraceUrls(beacon: TransportItem): TransportItem {
-  if (beacon.type !== TransportItemType.EXCEPTION) return beacon;
+  if (beacon.type !== TransportItemType.EXCEPTION) {
+    return beacon;
+  }
   const exception = beacon.payload as ExceptionEvent;
-  if (!exception.stacktrace?.frames) return beacon;
+  if (!exception.stacktrace?.frames) {
+    return beacon;
+  }
 
   return {
     ...beacon,

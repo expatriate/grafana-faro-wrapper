@@ -172,7 +172,9 @@ test('a startWhen predicate delays the clock and a throwing one means not yet', 
     failTime: 1000,
     startWhen: () => {
       calls += 1;
-      if (calls < 3) throw new Error('not mounted');
+      if (calls < 3) {
+        throw new Error('not mounted');
+      }
       return calls >= 5;
     },
     steps: { render: () => true },

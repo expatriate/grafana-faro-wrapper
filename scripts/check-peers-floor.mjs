@@ -13,12 +13,16 @@ const floors = Object.entries(pkg.peerDependencies).map(([name, range]) => [
 const faroFloor = floors[0][1];
 const workdir = mkdtempSync(join(tmpdir(), 'faro-wrapper-floor-'));
 
+const abort = (message) => {
+  rmSync(workdir, { recursive: true, force: true });
+  console.error(`✗ ${message}`);
+  process.exit(1);
+};
+
 const run = (command, args) => {
   const result = spawnSync(command, args, { cwd: workdir, stdio: 'inherit' });
   if (result.status !== 0) {
-    rmSync(workdir, { recursive: true, force: true });
-    console.error(`✗ ${command} ${args.join(' ')} failed on the peerDependencies floor`);
-    process.exit(1);
+    abort(`${command} ${args.join(' ')} failed on the peerDependencies floor`);
   }
 };
 
@@ -46,9 +50,7 @@ for (const [name, version] of floors) {
     readFileSync(join(workdir, 'node_modules', name, 'package.json'), 'utf8'),
   ).version;
   if (installed !== version) {
-    rmSync(workdir, { recursive: true, force: true });
-    console.error(`✗ ${name}@${installed} is installed instead of the floor ${version}`);
-    process.exit(1);
+    abort(`${name}@${installed} is installed instead of the floor ${version}`);
   }
 }
 run('npx', ['tsc', '--noEmit']);

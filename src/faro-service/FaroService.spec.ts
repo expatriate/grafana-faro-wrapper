@@ -31,6 +31,7 @@ function config(overrides: Partial<FaroServiceConfig> = {}): FaroServiceConfig {
 
 describe('FaroService', () => {
   let warnSpy: jest.SpyInstance;
+  const unregisteredFaro = faroWebSdk.faro;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -39,6 +40,7 @@ describe('FaroService', () => {
 
   afterEach(() => {
     warnSpy.mockRestore();
+    faroWebSdk.faro = unregisteredFaro;
   });
 
   test('getInstance throws if not initialized', () => {

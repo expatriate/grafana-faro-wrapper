@@ -5,7 +5,7 @@ import { sanitizeEventUrls, sanitizePageUrl, sanitizeStacktraceUrls } from '../u
 
 export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
-export const DEFAULT_SANITIZERS: readonly Sanitizer[] = [
+const DEFAULT_SANITIZERS: readonly Sanitizer[] = [
   sanitizePageUrl,
   sanitizeEventUrls,
   sanitizeStacktraceUrls,

@@ -2,6 +2,22 @@ import { sanitizeEventUrls, sanitizePageUrl, sanitizePath, sanitizeUrl } from '.
 
 describe('sanitizers', () => {
   describe('sanitizeUrl', () => {
+    test('treats an underscore as a separator around identifiers', () => {
+      expect(
+        sanitizeUrl(
+          'https://a.com/order_123456789/img/550e8400-e29b-41d4-a716-446655440000_thumb.png',
+        ),
+      ).toBe('a.com/order_:id/img/:id_thumb.png');
+    });
+
+    test('keeps identifiers glued to letters, as they are not standalone ids', () => {
+      expect(sanitizeUrl('https://a.com/v2/order123456789')).toBe('a.com/v2/order123456789');
+    });
+
+    test('never returns the query or hash, even for a URL it cannot parse', () => {
+      expect(sanitizeUrl('/checkout/1234567?accessToken=secret#step')).toBe('/checkout/:id');
+    });
+
     test('replaces UUID in pathname with :id', () => {
       const input = 'https://example.com/users/550e8400-e29b-41d4-a716-446655440000/profile';
       const out = sanitizeUrl(input);

@@ -6,7 +6,7 @@ import {
   TransportItem,
   TransportItemType,
 } from '@grafana/faro-core';
-import { parseMetricLabels } from '../measurement/parseMetricLabels';
+import { SanitizerPipeline } from '../faro-service/SanitizerPipeline';
 
 export function createRealFaro(): { faro: Faro; measurements: () => Record<string, any>[] } {
   const delivered: TransportItem[] = [];
@@ -17,10 +17,11 @@ export function createRealFaro(): { faro: Faro; measurements: () => Record<strin
       delivered.push(...[items].flat());
     }
   }
+  const sanitizers = new SanitizerPipeline();
   const faro = initializeFaro({
     app: { name: 'test' },
     batching: { enabled: false },
-    beforeSend: parseMetricLabels,
+    beforeSend: (item) => sanitizers.run(item),
     dedupe: true,
     globalObjectKey: 'faroMetricsTest',
     instrumentations: [],

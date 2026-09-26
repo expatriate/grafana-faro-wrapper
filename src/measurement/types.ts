@@ -1,16 +1,21 @@
 export type MetricLabels = Record<string, string | number | boolean>;
 
-export type MetricUnit =
-  | 'BYTES'
-  | 'MILLISECONDS'
-  | 'SECONDS'
-  | 'REQUESTS'
-  | 'ERRORS'
-  | 'OPERATIONS'
-  | 'EVENTS'
-  | 'UNITLESS';
+export const METRIC_UNITS = [
+  'BYTES',
+  'MILLISECONDS',
+  'SECONDS',
+  'REQUESTS',
+  'ERRORS',
+  'OPERATIONS',
+  'EVENTS',
+  'UNITLESS',
+] as const;
 
-export type MetricType = 'histogram' | 'counter' | 'gauge';
+export type MetricUnit = (typeof METRIC_UNITS)[number];
+
+export const METRIC_TYPES = ['histogram', 'counter', 'gauge'] as const;
+
+export type MetricType = (typeof METRIC_TYPES)[number];
 
 export type MetricResult = 'success' | 'fail';
 

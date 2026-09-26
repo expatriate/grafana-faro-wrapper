@@ -5,7 +5,7 @@ jest.mock('@grafana/faro-web-sdk', () => ({
   ...jest.requireActual('@grafana/faro-web-sdk'),
   initializeFaro: jest.fn((cfg) => ({
     ...cfg,
-    paused: false,
+    paused: cfg.paused ?? false,
     pause() {
       this.paused = true;
     },
@@ -21,7 +21,8 @@ jest.mock('@grafana/faro-transport-otlp-http', () => ({
   }),
 }));
 
-const { initializeFaro } = jest.requireMock('@grafana/faro-web-sdk');
+const faroWebSdk = jest.requireMock('@grafana/faro-web-sdk');
+const { initializeFaro } = faroWebSdk;
 const { OtlpHttpTransport } = jest.requireMock('@grafana/faro-transport-otlp-http');
 
 function config(overrides: Partial<FaroServiceConfig> = {}): FaroServiceConfig {
@@ -68,10 +69,35 @@ describe('FaroService', () => {
     );
   });
 
-  test('enabled: false starts Faro paused', () => {
-    new FaroService().init(config({ enabled: false }));
+  test('enabled: false starts Faro paused and keeps it paused after destroy and init', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init(config({ enabled: false }));
+    expect(faro.paused).toBe(true);
 
-    expect(initializeFaro).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
+    svc.destroy();
+    svc.init(config({ enabled: false }));
+
+    expect(faro.paused).toBe(true);
+    expect(svc.isInitialized).toBe(true);
+  });
+
+  test('puts the router instrumentation first and user transports after the OTLP one', () => {
+    const routerAdapter: any = { name: 'router' };
+    const userInstrumentation: any = { name: 'console' };
+    const userTransport: any = { name: 'debug' };
+
+    const faro: any = new FaroService().init(
+      config({
+        routerAdapter,
+        instrumentations: [userInstrumentation],
+        transports: [userTransport],
+      }),
+    );
+
+    expect(faro.instrumentations).toEqual([routerAdapter, userInstrumentation]);
+    expect(faro.transports).toHaveLength(2);
+    expect(faro.transports[0]).toBeInstanceOf(OtlpHttpTransport);
+    expect(faro.transports[1]).toBe(userTransport);
   });
 
   test('a second init warns and returns the same Faro instance', () => {
@@ -80,6 +106,35 @@ describe('FaroService', () => {
 
     expect(svc.init(config())).toBe(instance);
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('the default pipeline cleans URLs of events and stack frames and parses metric labels', () => {
+    const faro: any = new FaroService().init(config());
+    const secretUrl = 'https://shop.test/orders/1234567?token=secret';
+
+    const event = faro.beforeSend({
+      type: 'event',
+      meta: {},
+      payload: { name: 'resource', attributes: { url: secretUrl, kind: 'img' } },
+    });
+    const exception = faro.beforeSend({
+      type: 'exception',
+      meta: {},
+      payload: {
+        type: 'Error',
+        value: 'boom',
+        stacktrace: { frames: [{ filename: secretUrl, function: '?', lineno: 1, colno: 1 }] },
+      },
+    });
+    const measurement = faro.beforeSend({
+      type: 'measurement',
+      meta: {},
+      payload: { type: 'custom', values: { m: 1 }, context: { 'measurement.labels': '{"a":1}' } },
+    });
+
+    expect(event.payload.attributes).toEqual({ url: 'shop.test/orders/:id', kind: 'img' });
+    expect(exception.payload.stacktrace.frames[0].filename).toBe('shop.test/orders/:id');
+    expect(measurement.payload.context['measurement.labels']).toEqual({ a: 1 });
   });
 
   test('beforeSend wrapper sanitizes the page URL and then calls the user beforeSend', () => {
@@ -106,19 +161,49 @@ describe('FaroService', () => {
     expect(faro.beforeSend({ type: 'log', meta: {} })).toBeNull();
   });
 
-  test('a sanitizer changing the beacon in place does not change meta Faro keeps', () => {
+  test('a sanitizer changing the beacon in place does not change what Faro keeps', () => {
     const svc = new FaroService();
     const faro: any = svc.init(config());
-    svc.addSanitizer((beacon) => {
-      beacon.meta.user!.email = '[hidden]';
+    svc.addSanitizer((beacon: any) => {
+      beacon.meta.user.email = '[hidden]';
+      beacon.payload.context.email = '[hidden]';
       return beacon;
     });
     const storedUser = { email: 'john@example.com' };
+    const payload = { message: 'signed in', context: { email: 'john@example.com' } };
 
-    const sent = faro.beforeSend({ type: 'log', meta: { user: storedUser } });
+    const sent = faro.beforeSend({ type: 'log', meta: { user: storedUser }, payload });
 
     expect(sent.meta.user.email).toBe('[hidden]');
+    expect(sent.payload.context.email).toBe('[hidden]');
     expect(storedUser.email).toBe('john@example.com');
+    expect(payload.context.email).toBe('john@example.com');
+  });
+
+  test('user sanitizers run after the built-in ones, in the order they were added', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init(config());
+    const seen: string[] = [];
+    svc.addSanitizer([
+      (beacon) => {
+        seen.push(beacon.meta.page!.url!);
+        return beacon;
+      },
+      (beacon) => ({ ...beacon, meta: { ...beacon.meta, page: { url: 'second' } } }),
+    ]);
+
+    const sent = faro.beforeSend({ type: 'log', meta: { page: { url: 'https://a.test/x?t=1' } } });
+
+    expect(seen).toEqual(['a.test/x']);
+    expect(sent.meta.page.url).toBe('second');
+  });
+
+  test('addSanitizer rejects something that is not a function right away', () => {
+    const svc = new FaroService();
+    svc.init(config());
+
+    expect(() => svc.addSanitizer(undefined as any)).toThrow(TypeError);
+    expect(() => svc.addSanitizer([(beacon) => beacon, {} as any])).toThrow(TypeError);
   });
 
   test('drops only beacons a sanitizer throws on and warns once', () => {
@@ -157,7 +242,7 @@ describe('FaroService', () => {
       return (OtlpHttpTransport as jest.Mock).mock.calls[0][0].otlpTransform;
     }
 
-    test('includes the result of a metric sent through sendMetric', () => {
+    test('includes the result of a custom metric', () => {
       const context = constructMetricContext({
         description: 'checkout completed',
         unit: 'EVENTS',
@@ -246,11 +331,15 @@ describe('FaroService', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('faroKey, app'));
   });
 
-  test('destroy keeps default URL sanitization for beacons Faro still produces', () => {
+  test('after destroy and init the built-in sanitizers stay and user ones are dropped', () => {
     const svc = new FaroService();
     const faro: any = svc.init(config());
+    svc.addSanitizer(() => {
+      throw new Error('boom');
+    });
 
     svc.destroy();
+    svc.init(config());
     const beacon = faro.beforeSend({
       meta: { page: { url: 'https://example.com/users/1234567?accessToken=secret' } },
     });
@@ -258,11 +347,65 @@ describe('FaroService', () => {
     expect(beacon.meta.page.url).toBe('example.com/users/:id');
   });
 
-  test('init throws when Faro is already registered outside the service', () => {
+  test('a failing sanitizer added after destroy and init warns again', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init(config());
+    const failing = () => {
+      throw new Error('boom');
+    };
+    svc.addSanitizer(failing);
+    faro.beforeSend({ type: 'log', meta: {} });
+
+    svc.destroy();
+    svc.init(config());
+    svc.addSanitizer(failing);
+    faro.beforeSend({ type: 'log', meta: {} });
+
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  test('a second service on the page explains that Faro is already registered', () => {
     initializeFaro.mockReturnValueOnce(undefined);
     const svc = new FaroService();
 
-    expect(() => svc.init(config())).toThrow(/already registered/);
+    expect(() => svc.init(config())).toThrow(/single FaroService per page/);
     expect(svc.isInitialized).toBe(false);
+  });
+
+  test('keeps working with its own Faro when initialization throws after registration', () => {
+    initializeFaro.mockImplementationOnce((cfg: any) => {
+      faroWebSdk.faro = { ...cfg, transports: { transports: cfg.transports } };
+      throw new TypeError('instrumentation failed');
+    });
+    const svc = new FaroService();
+
+    const faro = svc.init(config());
+
+    expect(faro).toBe(faroWebSdk.faro);
+    expect(svc.isInitialized).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.any(String), 'instrumentation failed');
+  });
+
+  test('rethrows an initialization error when the registered Faro is not its own', () => {
+    initializeFaro.mockImplementationOnce(() => {
+      throw new TypeError('bad config');
+    });
+
+    expect(() => new FaroService().init(config())).toThrow('bad config');
+  });
+
+  test('trackSlo reports the metric through sendMetric and never throws', () => {
+    const svc = new FaroService();
+    const faro: any = svc.init(config());
+    faro.api = { pushMeasurement: jest.fn() };
+
+    svc.trackSlo({ name: 'page_ready', failTime: 1000, steps: { render: () => true } });
+    const broken = svc.trackSlo({ name: 'broken', failTime: 1000, steps: undefined as any });
+
+    expect(faro.api.pushMeasurement).toHaveBeenCalledWith(
+      { type: 'custom', values: { page_ready: expect.any(Number) } },
+      expect.objectContaining({ skipDedupe: true }),
+    );
+    expect(broken.state).toBe('disposed');
   });
 });

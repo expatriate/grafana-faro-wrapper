@@ -61,8 +61,28 @@ test('stamps the measurement with the metric timestamp when one is given', () =>
   expect(measurement.timestamp).toBe('2026-01-01T00:00:00.000Z');
 });
 
-test('sends 0 instead of a value that is not a number', () => {
-  const [measurement] = sendThroughRealFaro({ ...click, value: Number.NaN });
+test('sends 0 instead of a value that is not a finite number', () => {
+  const measurements = sendThroughRealFaro(
+    { ...click, value: Number.NaN },
+    { ...click, value: 1 / 0 },
+    { ...click, value: -Infinity },
+  );
 
-  expect(measurement.values).toEqual({ user_action: 0 });
+  expect(measurements.map((measurement) => measurement.values)).toEqual([
+    { user_action: 0 },
+    { user_action: 0 },
+    { user_action: 0 },
+  ]);
+});
+
+test('warns once about a metric a plain-JS page gets wrong, and still sends it', () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const typo = { ...click, name: 'typo_metric', unit: 'ms', type: 'hist' } as unknown as Metric;
+
+  const measurements = sendThroughRealFaro(typo, typo);
+
+  expect(measurements).toHaveLength(2);
+  expect(warn).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('typo_metric" has invalid unit, type'));
+  warn.mockRestore();
 });

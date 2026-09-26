@@ -1,11 +1,25 @@
 import { TransportItem } from '@grafana/faro-web-sdk';
 import { parseMetricLabels } from '../measurement/parseMetricLabels';
 import { LOG_PREFIX } from '../utils/logPrefix';
-import { sanitizeEventUrls, sanitizePageUrl } from '../utils/sanitizers';
+import { sanitizeEventUrls, sanitizePageUrl, sanitizeStacktraceUrls } from '../utils/sanitizers';
 
 export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
-const DEFAULT_SANITIZERS: Sanitizer[] = [sanitizePageUrl, sanitizeEventUrls, parseMetricLabels];
+export const DEFAULT_SANITIZERS: readonly Sanitizer[] = [
+  sanitizePageUrl,
+  sanitizeEventUrls,
+  sanitizeStacktraceUrls,
+  parseMetricLabels,
+];
+
+function copyBeacon(beacon: TransportItem): TransportItem {
+  const copy: TransportItem = JSON.parse(JSON.stringify(beacon));
+  const originalError = (beacon.payload as { originalError?: Error } | undefined)?.originalError;
+  if (originalError) {
+    (copy.payload as { originalError?: Error }).originalError = originalError;
+  }
+  return copy;
+}
 
 export class SanitizerPipeline {
   private sanitizers = [...DEFAULT_SANITIZERS];
@@ -18,20 +32,18 @@ export class SanitizerPipeline {
 
   reset() {
     this.sanitizers = [...DEFAULT_SANITIZERS];
+    this.failureReported = false;
   }
 
   run(beacon: TransportItem): TransportItem | null {
     try {
-      return this.sanitizers.reduce<TransportItem>(
-        (item, sanitize) => {
-          const sanitized = sanitize(item);
-          if (typeof sanitized !== 'object' || sanitized === null) {
-            throw new TypeError('sanitizer returned no beacon');
-          }
-          return sanitized;
-        },
-        { ...beacon, meta: JSON.parse(JSON.stringify(beacon.meta)) },
-      );
+      return this.sanitizers.reduce<TransportItem>((item, sanitize) => {
+        const sanitized = sanitize(item);
+        if (typeof sanitized !== 'object' || sanitized === null) {
+          throw new TypeError('sanitizer returned no beacon');
+        }
+        return sanitized;
+      }, copyBeacon(beacon));
     } catch (error) {
       if (!this.failureReported) {
         this.failureReported = true;

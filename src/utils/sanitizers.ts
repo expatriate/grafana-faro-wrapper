@@ -1,16 +1,25 @@
-import { EventEvent, TransportItem, TransportItemType } from '@grafana/faro-web-sdk';
+import {
+  EventEvent,
+  ExceptionEvent,
+  TransportItem,
+  TransportItemType,
+} from '@grafana/faro-web-sdk';
 
-const UUID_WITH_OPTIONAL_SUFFIX =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[a-z0-9]*\b/g;
-const LONG_HEX_ID = /\b[0-9a-f]{12,}\b/g;
-const NUMERIC_ID = /\b\d{6,}\b/g;
+const ID_START = '(^|[^0-9a-z])';
+const ID_END = '(?=$|[^0-9a-z])';
+const idPattern = (id: string) => new RegExp(`${ID_START}${id}${ID_END}`, 'g');
 
-const ID_PATTERNS = [UUID_WITH_OPTIONAL_SUFFIX, LONG_HEX_ID, NUMERIC_ID];
+const ID_PATTERNS = [
+  idPattern('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[a-z0-9]*'),
+  idPattern('[0-9a-f]{12,}'),
+  idPattern('\\d{6,}'),
+];
 const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
+const QUERY_OR_HASH = /[?#]/;
 
 export function sanitizePath(pathname: string): string {
   return ID_PATTERNS.reduce(
-    (path, pattern) => path.replace(pattern, ':id'),
+    (path, pattern) => path.replace(pattern, '$1:id'),
     pathname.toLowerCase(),
   );
 }
@@ -20,9 +29,12 @@ export function sanitizeUrl(input: string): string {
     const url = new URL(input);
     return url.host + sanitizePath(url.pathname);
   } catch {
-    return input;
+    return sanitizePath(input.split(QUERY_OR_HASH)[0]);
   }
 }
+
+const sanitizeIfUrl = (value: string) =>
+  ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value;
 
 export function sanitizePageUrl(beacon: TransportItem): TransportItem {
   const url = beacon.meta.page?.url;
@@ -44,11 +56,28 @@ export function sanitizeEventUrls(beacon: TransportItem): TransportItem {
     payload: {
       ...event,
       attributes: Object.fromEntries(
-        Object.entries(event.attributes).map(([key, value]) => [
-          key,
-          ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value,
-        ]),
+        Object.entries(event.attributes).map(([key, value]) => [key, sanitizeIfUrl(value)]),
       ),
+    },
+  };
+}
+
+export function sanitizeStacktraceUrls(beacon: TransportItem): TransportItem {
+  if (beacon.type !== TransportItemType.EXCEPTION) return beacon;
+  const exception = beacon.payload as ExceptionEvent;
+  if (!exception.stacktrace?.frames) return beacon;
+
+  return {
+    ...beacon,
+    payload: {
+      ...exception,
+      stacktrace: {
+        ...exception.stacktrace,
+        frames: exception.stacktrace.frames.map((frame) => ({
+          ...frame,
+          filename: sanitizeIfUrl(frame.filename),
+        })),
+      },
     },
   };
 }

@@ -7,6 +7,9 @@ function waitForImage(image: HTMLImageElement, timeoutMs: number): Promise<boole
   if (!src) {
     return Promise.resolve(false);
   }
+  if (image.complete && image.naturalWidth > 0) {
+    return Promise.resolve(true);
+  }
   return isVisibleOnceLoaded(image, src, () => image.decode(), timeoutMs);
 }
 

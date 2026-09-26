@@ -15,3 +15,23 @@ test('treats a template placeholder with only whitespace or a comment as empty',
   expect(checkRenderInnerValue('.name')).toBe(false);
   expect(checkRenderInnerValue('.price')).toBe(false);
 });
+
+test('does not count styles, scripts or invisible characters as text', () => {
+  document.body.innerHTML = `
+    <div class="style"><style>.a { color: red }</style></div>
+    <div class="script"><script type="application/json">{"a":1}</script></div>
+    <div class="zero-width">&#8203;&#65279;</div>
+    <div class="text-with-style"><style>.a{}</style>Pro</div>`;
+
+  expect(checkRenderInnerValue('.style')).toBe(false);
+  expect(checkRenderInnerValue('.script')).toBe(false);
+  expect(checkRenderInnerValue('.zero-width')).toBe(false);
+  expect(checkRenderInnerValue('.text-with-style')).toBe(true);
+});
+
+test('relies on the text the browser renders, so hidden text does not count', () => {
+  document.body.innerHTML = '<div class="price"><span style="display:none">9$</span></div>';
+  Object.defineProperty(document.querySelector('.price'), 'innerText', { value: '' });
+
+  expect(checkRenderInnerValue('.price')).toBe(false);
+});

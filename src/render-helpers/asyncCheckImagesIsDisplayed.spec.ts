@@ -55,3 +55,11 @@ test('checks images inside a wrapper and fails on a wrapper without images', asy
   await expect(asyncCheckImagesIsDisplayed('[data-slo="logo"]')).resolves.toBe(true);
   await expect(asyncCheckImagesIsDisplayed('[data-slo]')).resolves.toBe(false);
 });
+
+test('passes for an already loaded image even when decode never settles, as in a hidden tab', async () => {
+  jest.useFakeTimers();
+  const [logo] = renderImages('https://a.com/logo.png');
+  stubDecodedImage(logo, { naturalWidth: 120, complete: true, decode: new Promise(() => {}) });
+
+  await expect(asyncCheckImagesIsDisplayed('img', 500)).resolves.toBe(true);
+});

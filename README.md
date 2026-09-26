@@ -246,12 +246,12 @@ faroService.trackSlo({
 | Хелпер                                                        | Проходит, когда                                                                     |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `checkRender(selectors)`                                      | каждый селектор (строка или массив) есть в DOM                                      |
-| `checkRenderInnerValue(selectors)`                            | каждый элемент есть и содержит текст, не только пробелы                             |
-| `checkEnabledButtonState(selector)`                           | кнопка есть, без `disabled` и без класса `disabled`                                 |
+| `checkRenderInnerValue(selectors)`                            | каждый элемент есть и показывает текст: пробелы, скрытый текст, стили не в счёт     |
+| `checkEnabledButtonState(selector)`                           | кнопка есть и нажимается: не `:disabled`, без `aria-disabled` и класса `disabled`   |
 | `getAmount(selector)`                                         | возвращает число элементов                                                          |
 | `checkAmount(selector, n)`, `checkGTEAmount(selector, n)`     | элементов ровно `n` / не меньше `n`                                                 |
 | `checkImagesIsDisplayed(selector)`                            | синхронно: все картинки уже загружены (битый SVG не отличает, см. ниже)             |
-| `asyncCheckImagesIsDisplayed(selector, timeoutMs?)`           | все картинки декодированы (`img.decode()`) за `timeoutMs`                           |
+| `asyncCheckImagesIsDisplayed(selector, timeoutMs?)`           | все картинки загружены или декодированы (`img.decode()`) за `timeoutMs`             |
 | `asyncCheckBackgroundImagesIsDisplayed(selector, timeoutMs?)` | у каждого элемента загрузилась своя картинка: `<img>` внутри или `background-image` |
 | `extractBackgroundUrl(element)`                               | возвращает URL из `background-image` или `null`                                     |
 | `loadImage(src, timeoutMs?)`                                  | картинка по адресу загрузилась за `timeoutMs`                                       |
@@ -260,7 +260,8 @@ faroService.trackSlo({
 - Селектор может указывать на `<img>` или на обёртку: тогда проверяются картинки внутри, обёртка без них — `false`.
 - Растровая картинка с нулевой шириной считается сломанной, SVG без собственных размеров — загруженным.
   Синхронная проверка не отличает битый SVG от загруженного — для SVG берите `asyncCheckImagesIsDisplayed`.
-  «IsDisplayed» значит «загружено», а не «видно на экране».
+  «IsDisplayed» значит «загружено», а не «видно на экране». Картинку с `loading="lazy"` за пределами экрана
+  браузер не грузит, и проверка вернёт `false` по таймауту — такие картинки в шаги не добавляйте.
 - Из `background-image` берётся первый `url()`. Элемент без `<img>` и без `url()` — например, с фоном из одного
   градиента — даёт `false`; фоны `::before`/`::after` не учитываются.
 

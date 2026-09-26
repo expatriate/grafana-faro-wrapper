@@ -4,3 +4,5 @@ docs
 .claude
 package-lock.json
 .impeccable
+test-results
+playwright-report

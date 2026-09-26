@@ -343,6 +343,7 @@ npm install
 npm run dev                  # сборка всех бандлов и типов в watch-режиме
 npm run check                # формат, линт, типы, тесты, сборка, запуск бандлов, примеры README
 npm run verify:peers-floor   # типы и тесты на нижней границе peerDependencies
+npm run verify:browsers      # хелперы на настоящих картинках в Chromium, Firefox и WebKit
 ```
 
 Релиз — по git-тегу `v*`: `npm version <patch|minor|major>`, затем `git push --follow-tags`. Воркфлоу

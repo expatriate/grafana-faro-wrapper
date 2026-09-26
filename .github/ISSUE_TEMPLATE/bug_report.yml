@@ -1,0 +1,61 @@
+name: Баг
+description: Пакет ведёт себя не так, как описано в README
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Уязвимость или утечка данных в Grafana? Не открывайте публичный issue — сообщите приватно по [политике безопасности](https://github.com/expatriate/grafana-faro-wrapper/security/policy).
+        Удалите из примеров `faroKey`, адрес коллектора и персональные данные.
+  - type: input
+    id: version
+    attributes:
+      label: Версия grafana-faro-wrapper
+      placeholder: '1.3.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: bundle
+    attributes:
+      label: Как подключён пакет
+      options:
+        - ESM через сборщик (import)
+        - CommonJS (require)
+        - dist/index.umd.full.js без сборщика
+        - dist/index.umd.js вместе с IIFE Faro
+    validations:
+      required: true
+  - type: input
+    id: faro
+    attributes:
+      label: Версия @grafana/faro-web-sdk
+      description: Для dist/index.umd.full.js не нужна — Faro внутри бандла.
+      placeholder: '2.12.1'
+  - type: input
+    id: environment
+    attributes:
+      label: Браузер и ОС
+      placeholder: Chrome 140, macOS 26
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Лучше всего — минимальный пример с вызовом init, trackSlo или sendMetric.
+      render: typescript
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидали
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что произошло
+      description: Предупреждения из консоли с префиксом [grafana-faro-wrapper], ошибки, что пришло или не пришло в Grafana.
+    validations:
+      required: true

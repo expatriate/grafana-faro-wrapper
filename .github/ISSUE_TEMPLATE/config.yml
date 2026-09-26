@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Уязвимость или утечка данных
+    url: https://github.com/expatriate/grafana-faro-wrapper/security/advisories/new
+    about: Сообщите приватно — отчёт видит только мейнтейнер.
+  - name: Баг самого Grafana Faro
+    url: https://github.com/grafana/faro-web-sdk/issues
+    about: Если проблема воспроизводится и без обёртки, напрямую через Faro.

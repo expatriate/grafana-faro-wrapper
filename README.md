@@ -332,6 +332,9 @@ faroService.addSanitizer((beacon) => {
 
 ## Разработка
 
+Как предложить изменение — в [CONTRIBUTING.md](CONTRIBUTING.md); об уязвимостях сообщайте приватно, по
+[SECURITY.md](SECURITY.md).
+
 Нужен Node 22.18+ (конфиги сборки и тестов — TypeScript без загрузчика).
 
 ```bash

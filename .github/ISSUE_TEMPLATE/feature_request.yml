@@ -1,0 +1,24 @@
+name: Предложение
+description: Новая возможность или изменение API
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую задачу вы решаете
+      description: Что приходится делать сейчас и чем это неудобно. Задача важнее готового решения.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Что предлагаете
+      description: Как это могло бы выглядеть в коде потребителя.
+      render: typescript
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Какие варианты рассматривали
+      description: Например, свой санитайзер, beforeSend или прямой вызов API Faro.

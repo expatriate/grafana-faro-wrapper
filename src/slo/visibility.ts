@@ -3,24 +3,41 @@ interface Pausable {
   resume(): void;
 }
 
-const HIDING_EVENTS = ['pagehide', 'blur'] as const;
-const SHOWING_EVENTS = ['pageshow', 'focus'] as const;
-
-export function pauseWhileHidden(run: Pausable): () => void {
+export function pauseWhenHidden(run: Pausable): () => void {
+  let focusCheck: ReturnType<typeof setTimeout> | undefined;
   const pause = () => run.pause();
-  const resume = () => run.resume();
-  const onVisibilityChange = () => (document.hidden ? pause() : resume());
+  const resumeIfVisible = () => {
+    if (!document.hidden) {
+      run.resume();
+    }
+  };
+  const syncWithVisibility = () => (document.hidden ? pause() : resumeIfVisible());
+  const pauseIfFocusLeftPage = () => {
+    clearTimeout(focusCheck);
+    // Focus moving into a nested iframe blurs the window before hasFocus() reports it
+    focusCheck = setTimeout(() => {
+      if (!document.hasFocus()) {
+        pause();
+      }
+    });
+  };
 
-  HIDING_EVENTS.forEach((event) => window.addEventListener(event, pause));
-  SHOWING_EVENTS.forEach((event) => window.addEventListener(event, resume));
-  document.addEventListener('visibilitychange', onVisibilityChange);
+  const windowListeners = [
+    ['pagehide', pause],
+    ['blur', pauseIfFocusLeftPage],
+    ['pageshow', resumeIfVisible],
+    ['focus', resumeIfVisible],
+  ] as const;
+
+  windowListeners.forEach(([event, listener]) => window.addEventListener(event, listener));
+  document.addEventListener('visibilitychange', syncWithVisibility);
   if (document.hidden) {
     pause();
   }
 
   return () => {
-    HIDING_EVENTS.forEach((event) => window.removeEventListener(event, pause));
-    SHOWING_EVENTS.forEach((event) => window.removeEventListener(event, resume));
-    document.removeEventListener('visibilitychange', onVisibilityChange);
+    clearTimeout(focusCheck);
+    windowListeners.forEach(([event, listener]) => window.removeEventListener(event, listener));
+    document.removeEventListener('visibilitychange', syncWithVisibility);
   };
 }

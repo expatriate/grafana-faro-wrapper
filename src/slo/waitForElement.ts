@@ -1,10 +1,12 @@
+import { queryOne } from '../utils/safeQuery';
+
 export function waitForElement(selector: string, onFound: () => void): () => void {
-  if (document.querySelector(selector)) {
+  if (queryOne(selector)) {
     onFound();
     return () => {};
   }
   const observer = new MutationObserver(() => {
-    if (!document.querySelector(selector)) {
+    if (!queryOne(selector)) {
       return;
     }
     observer.disconnect();

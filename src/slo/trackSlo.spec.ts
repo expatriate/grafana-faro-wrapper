@@ -130,3 +130,147 @@ test('disposing while waiting for the element sends nothing when it appears late
   expect(tracker.state).toBe('disposed');
   expect(measurements()).toHaveLength(0);
 });
+
+test('starts at once when the startWhen element is already on the page', () => {
+  document.body.innerHTML = '<a data-slo="reseller-link"></a>';
+
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'resellers_ready',
+    failTime: 1000,
+    startWhen: '[data-slo="reseller-link"]',
+    steps: { list: () => true },
+  });
+
+  expect(tracker.state).toBe('done');
+  expect(measurements()[0]).toMatchObject({ values: { resellers_ready: 0 } });
+});
+
+test('an invalid startWhen selector warns and keeps waiting instead of throwing', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const { tracker } = trackThroughRealFaro({
+    name: 'resellers_ready',
+    failTime: 1000,
+    startWhen: '[data-slo=reseller link]',
+    steps: { list: () => true },
+  });
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
+
+  expect(tracker.state).toBe('waiting');
+  expect(warn).toHaveBeenCalledWith(
+    expect.stringContaining('[data-slo=reseller link]'),
+    expect.anything(),
+  );
+  tracker.dispose();
+  warn.mockRestore();
+});
+
+test('a startWhen predicate delays the clock and a throwing one means not yet', async () => {
+  let calls = 0;
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    startWhen: () => {
+      calls += 1;
+      if (calls < 3) throw new Error('not mounted');
+      return calls >= 5;
+    },
+    steps: { render: () => true },
+  });
+
+  await jest.advanceTimersByTimeAsync(3 * STEP_CHECK_INTERVAL_MS);
+  expect(tracker.state).toBe('waiting');
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
+
+  expect(measurements()[0]).toMatchObject({ values: { page_ready: 0 } });
+});
+
+test('pauseWhenHidden: false keeps counting while the tab is hidden', async () => {
+  let rendered = false;
+  const { measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 10_000,
+    pauseWhenHidden: false,
+    steps: { render: () => rendered },
+  });
+
+  Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  await jest.advanceTimersByTimeAsync(10 * STEP_CHECK_INTERVAL_MS);
+  rendered = true;
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
+  Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+
+  expect(measurements()[0]).toMatchObject({ values: { page_ready: 11 * STEP_CHECK_INTERVAL_MS } });
+});
+
+test('static labels can be passed as an object, like in sendMetric', () => {
+  const { measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    labels: { payment: 'card' },
+    steps: { render: () => true },
+  });
+
+  expect(measurements()[0].context['measurement.labels']).toEqual({
+    status: 'success',
+    render: true,
+    payment: 'card',
+  });
+});
+
+test('labels cannot override the status or a step result, and the clash is reported', () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const { measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 300,
+    labels: () => ({ status: 'success', render: 'ssr', source: 'landing' }),
+    steps: { render: () => false },
+  });
+  jest.advanceTimersByTime(300);
+
+  expect(measurements()[0].context['measurement.labels']).toEqual({
+    status: 'fail',
+    render: false,
+    source: 'landing',
+  });
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('status, render'));
+  warn.mockRestore();
+});
+
+test('a labels() function that throws sends the metric without extra labels', () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const { measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    labels: () => {
+      throw new Error('store is not ready');
+    },
+    steps: { render: () => true },
+  });
+
+  expect(measurements()[0].context['measurement.labels']).toEqual({
+    status: 'success',
+    render: true,
+  });
+  expect(warn).toHaveBeenCalledTimes(1);
+  warn.mockRestore();
+});
+
+test('an SLO without steps is not tracked and sends nothing', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    steps: {},
+  });
+  await jest.advanceTimersByTimeAsync(1000);
+
+  expect(tracker.state).toBe('disposed');
+  expect(measurements()).toHaveLength(0);
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('page_ready'));
+  warn.mockRestore();
+});

@@ -25,7 +25,7 @@
     "type": "git",
     "url": "git+https://github.com/expatriate/grafana-faro-wrapper.git"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "DmitryK (https://github.com/expatriate)",
   "type": "module",
   "main": "dist/index.cjs",

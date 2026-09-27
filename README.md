@@ -365,4 +365,4 @@ npm run verify:browsers      # хелперы на настоящих карти
 
 ## Лицензия
 
-MIT © [DmitryK](https://github.com/expatriate)
+Apache-2.0 © [DmitryK](https://github.com/expatriate)

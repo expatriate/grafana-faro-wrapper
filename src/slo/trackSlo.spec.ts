@@ -1,3 +1,6 @@
+import { asyncCheckBackgroundImagesIsDisplayed } from '../render-helpers/asyncCheckBackgroundImagesIsDisplayed';
+import { asyncCheckImagesIsDisplayed } from '../render-helpers/asyncCheckImagesIsDisplayed';
+import { checkImagesIsDisplayed } from '../render-helpers/checkImagesIsDisplayed';
 import { createRealFaro } from '../testing/realFaro';
 import { sendMeasurement } from '../measurement/sendMeasurement';
 import { STEP_CHECK_INTERVAL_MS } from './SloRun';
@@ -346,4 +349,39 @@ test('a step named like an Object method is not reported as a label clash', () =
   });
 
   expect(warn).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['asyncCheckImagesIsDisplayed', () => asyncCheckImagesIsDisplayed('.hero img')],
+  ['checkImagesIsDisplayed', () => checkImagesIsDisplayed('.hero img')],
+  ['asyncCheckBackgroundImagesIsDisplayed', () => asyncCheckBackgroundImagesIsDisplayed('.hero')],
+])('%s fails its step at once on an <img> without src', async (_, check) => {
+  document.body.innerHTML = '<div class="hero"><img></div>';
+
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'hero_ready',
+    failTime: 10_000,
+    steps: { render: () => true, hero: check },
+  });
+  await jest.advanceTimersByTimeAsync(0);
+
+  expect(tracker.state).toBe('done');
+  expect(measurements()[0]).toMatchObject({
+    values: { hero_ready: 0 },
+    context: { 'measurement.result': 'fail', 'measurement.labels': { hero: false } },
+  });
+});
+
+test('an image with src that is still loading keeps its step waiting', async () => {
+  document.body.innerHTML = '<div class="hero"><img src="https://a.com/hero.png"></div>';
+
+  const { tracker } = trackThroughRealFaro({
+    name: 'hero_ready',
+    failTime: 10_000,
+    steps: { hero: () => checkImagesIsDisplayed('.hero img') },
+  });
+  await jest.advanceTimersByTimeAsync(5 * STEP_CHECK_INTERVAL_MS);
+
+  expect(tracker.state).toBe('running');
+  tracker.dispose();
 });

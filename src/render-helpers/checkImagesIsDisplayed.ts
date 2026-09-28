@@ -1,10 +1,11 @@
 import { queryAll } from '../utils/safeQuery';
-import { hasVisiblePixels, imageSource, imagesOf } from './imageRules';
+import { failStepIfSourceMissing, hasVisiblePixels, imageSource, imagesOf } from './imageRules';
 
 function isElementImageLoaded(element: Element): boolean {
   const images = imagesOf(element);
   return (
     images.length > 0 &&
+    !failStepIfSourceMissing(images) &&
     images.every((image) => image.complete && hasVisiblePixels(image, imageSource(image)))
   );
 }

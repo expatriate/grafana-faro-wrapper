@@ -1,3 +1,4 @@
+import { failStepNow } from '../slo/failStep';
 import { withTimeout } from './withTimeout';
 
 export function isSvgSource(src: string): boolean {
@@ -17,6 +18,14 @@ export function hasSource(image: HTMLImageElement): boolean {
     Boolean(image.getAttribute('src') || image.getAttribute('srcset')) ||
     image.parentElement instanceof HTMLPictureElement
   );
+}
+
+export function failStepIfSourceMissing(images: HTMLImageElement[]): boolean {
+  const missing = images.some((image) => !hasSource(image));
+  if (missing) {
+    failStepNow();
+  }
+  return missing;
 }
 
 export function imagesOf(element: Element): HTMLImageElement[] {

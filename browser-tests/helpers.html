@@ -547,6 +547,14 @@
           check('loadImage', 'slow-without-timeout', actual, true),
         );
 
+        const withoutSource = new H.FaroService().trackSlo({
+          name: 'image_without_source',
+          failTime: 5000,
+          pauseWhenHidden: false,
+          steps: { hero: () => H.asyncCheckImagesIsDisplayed(sel('img-no-src')) },
+        });
+        check('trackSlo', 'image-without-src-fails-at-once', withoutSource.state, 'done');
+
         const retried = `/img/missing.png?retried-${Math.random().toString(36).slice(2)}`;
         add('bg-retried-in-slo', '<div class="bg"></div>');
         document.querySelector(sel('bg-retried-in-slo')).style.backgroundImage = `url(${retried})`;

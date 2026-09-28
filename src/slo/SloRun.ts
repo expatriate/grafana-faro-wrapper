@@ -1,4 +1,5 @@
 import { LOG_PREFIX } from '../utils/logPrefix';
+import { callStepCheck } from './failStep';
 import {
   SloRunOptions,
   SloRunResult,
@@ -196,11 +197,16 @@ export class SloRun<S extends string> {
   }
 
   private runCheck(name: S, check: StepCheck) {
-    let outcome: unknown;
+    let call: { outcome: unknown; failedNow: boolean };
     try {
-      outcome = check();
+      call = callStepCheck(check);
     } catch (error) {
       this.logStepError(name, error);
+      return;
+    }
+    const { outcome, failedNow } = call;
+    if (failedNow) {
+      this.record(name, false);
       return;
     }
     if (!isThenable(outcome)) {

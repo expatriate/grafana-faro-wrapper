@@ -375,7 +375,8 @@ faroService.addSanitizer((beacon) => {
 Как предложить изменение — в [CONTRIBUTING.md](CONTRIBUTING.md); об уязвимостях сообщайте приватно, по
 [SECURITY.md](SECURITY.md).
 
-Нужен Node 22.18+ (конфиги сборки и тестов — TypeScript без загрузчика).
+Нужен Node 22.18+ (конфиги сборки и тестов — TypeScript без загрузчика). Это требование только к разработке
+в репозитории, на установку пакета оно не влияет.
 
 ```bash
 npm install

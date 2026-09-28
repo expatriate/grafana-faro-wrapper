@@ -43,6 +43,9 @@ const declaredValues = [
     .filter((name) => name && !name.startsWith('type '))
     .map((name) => name.split(/\s+as\s+/).pop()),
 );
+if (declaredValues.length === 0) {
+  fail(`${OUTPUTS.types} has no value exports this check can read: update the export pattern`);
+}
 const runtimeValues = Object.keys(await import(resolve(root, OUTPUTS.esm)));
 const typedOnly = declaredValues.filter((name) => !runtimeValues.includes(name));
 if (typedOnly.length) {

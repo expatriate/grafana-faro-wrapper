@@ -9,7 +9,7 @@ const readme = readFileSync(resolve(root, 'README.md'), 'utf8');
 
 const imports = new Map();
 const bodies = [];
-for (const [, block] of readme.matchAll(/```(?:typescript|tsx)\n([\s\S]*?)```/g)) {
+for (const [, block] of readme.matchAll(/```(?:typescript|tsx|ts)\n([\s\S]*?)```/g)) {
   const body = block.replace(/import \{([^}]*)\} from '([^']+)';\n?/g, (_, names, module) => {
     const known = imports.get(module) ?? new Set();
     names
@@ -21,6 +21,11 @@ for (const [, block] of readme.matchAll(/```(?:typescript|tsx)\n([\s\S]*?)```/g)
     return '';
   });
   bodies.push(`{\n${body.replace(/^export /gm, '')}}`);
+}
+
+if (bodies.length === 0) {
+  console.error('✗ README has no TypeScript examples to check: update the code block pattern');
+  process.exit(1);
 }
 
 const declaredForExamples = `

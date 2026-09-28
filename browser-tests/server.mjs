@@ -53,6 +53,7 @@ const IMAGES = {
 };
 const FILES = {
   '/': ['text/html', resolve(here, 'helpers.html')],
+  '/legacy': ['text/html; charset=windows-1251', resolve(here, 'legacy.html')],
   '/bundle.js': ['text/javascript', resolve(root, OUTPUTS.umdFull)],
 };
 

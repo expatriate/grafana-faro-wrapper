@@ -1,4 +1,7 @@
+import { forgetLayout, renderAs } from '../testing/layoutStubs';
 import { checkEnabledButtonState } from './checkEnabledButtonState';
+
+afterEach(forgetLayout);
 
 test('passes only for a present button that is neither disabled nor styled as disabled', () => {
   document.body.innerHTML = `
@@ -44,9 +47,7 @@ test('passes when any matching button can be clicked, even if a hidden copy is d
 
 test('treats a button the browser does not render as not clickable', () => {
   document.body.innerHTML = '<button class="pay"></button>';
-  const button = document.querySelector('.pay')!;
-  Object.defineProperty(button, 'innerText', { value: '' });
-  button.getClientRects = () => [] as unknown as DOMRectList;
+  renderAs(document.querySelector('.pay')!, { text: '', rendered: false });
 
   expect(checkEnabledButtonState('.pay')).toBe(false);
 });

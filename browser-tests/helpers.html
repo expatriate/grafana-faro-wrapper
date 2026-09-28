@@ -35,6 +35,15 @@
         },
       );
 
+      customElements.define(
+        'price-tag',
+        class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: 'open' }).innerHTML = '<span>9$</span>';
+          }
+        },
+      );
+
       const imageCases = [
         ['img-html-200', '<img src="/img/html-page.png">', false, false],
         [
@@ -179,6 +188,12 @@
           'README: берётся первый url()',
         ],
         ['bg-image-set-url', 'background-image:image-set(url(/img/ok.png) 1x)', true],
+        [
+          'bg-image-set-equal-density',
+          'background-image:image-set(url(/img/ok.png?first) 1x, url(/img/missing.png?second) 1x)',
+          true,
+          'браузер показывает первый из равных',
+        ],
         ['bg-image-set-string', 'background-image:image-set("/img/ok.png" 1x)', true],
         ['bg-svg-bare', 'background-image:url(/img/bare.svg)', true],
         ['bg-svg-404', 'background-image:url(/img/missing.svg)', false],
@@ -248,6 +263,16 @@
   <button id="b-pointer-none" style="pointer-events:none">x</button>
   <fieldset disabled><legend><button id="b-legend">x</button></legend></fieldset>
   <button class="b-dup" disabled style="display:none">x</button><button class="b-dup">x</button>
+  <svg width="60" height="20"><text id="svg-text" x="0" y="15">Pro</text></svg>
+  <svg width="60" height="20"><text id="svg-text-hidden" x="0" y="15" style="display:none">Pro</text></svg>
+  <svg width="60" height="20" style="display:none"><text id="svg-in-hidden" x="0" y="15">Pro</text></svg>
+  <details><summary><button id="b-in-summary">x</button></summary><button id="b-in-details">x</button></details>
+  <div hidden="until-found"><button id="b-until-found">x</button></div>
+  <div style="content-visibility:hidden"><button id="b-cv-hidden">x</button></div>
+  <select id="plan"><option id="plan-basic">Basic</option><option id="plan-pro" selected>Pro</option></select>
+  <price-tag id="price"></price-tag>
+  <div id="t-fsi-pdi">&#x2068;&#x2069;</div>
+  <div id="t-soft-hyphen">&shy;</div>
 `,
       );
 
@@ -490,6 +515,37 @@
           true,
         );
         check('checkEnabledButtonState', 'duplicates-hidden-disabled', pressable('.b-dup'), true);
+        check('checkEnabledButtonState', 'in-summary', pressable('#b-in-summary'), true);
+        check('checkEnabledButtonState', 'in-closed-details', pressable('#b-in-details'), false);
+        check('checkEnabledButtonState', 'hidden-until-found', pressable('#b-until-found'), false);
+        check(
+          'checkEnabledButtonState',
+          'content-visibility-hidden',
+          pressable('#b-cv-hidden'),
+          false,
+        );
+
+        check('checkRenderInnerValue', 'svg-text', shows('#svg-text'), true);
+        check('checkRenderInnerValue', 'svg-text-hidden', shows('#svg-text-hidden'), false);
+        check('checkRenderInnerValue', 'svg-in-hidden-svg', shows('#svg-in-hidden'), false);
+        check('checkRenderInnerValue', 'select', shows('#plan'), true, 'текст выбранного');
+        check('checkRenderInnerValue', 'selected-option', shows('#plan-pro'), true);
+        check('checkRenderInnerValue', 'other-option', shows('#plan-basic'), false);
+        check('checkRenderInnerValue', 'shadow-dom-text', shows('#price'), true);
+        check('checkRenderInnerValue', 'bidi-isolates-only', shows('#t-fsi-pdi'), false);
+        check('checkRenderInnerValue', 'soft-hyphen-only', shows('#t-soft-hyphen'), false);
+
+        check('checkAmount', 'invalid-selector-zero', H.checkAmount('#list li[', 0), false);
+        check('checkGTEAmount', 'invalid-selector-zero', H.checkGTEAmount('#list li[', 0), false);
+        check(
+          'extractBackgroundUrl',
+          'bg-image-set-equal-density',
+          bgUrl('bg-image-set-equal-density'),
+          `${location.origin}/img/ok.png?first`,
+        );
+        const unlimited = H.loadImage('/img/slow.png?unlimited', Infinity).then((actual) =>
+          check('loadImage', 'slow-without-timeout', actual, true),
+        );
 
         const retried = `/img/missing.png?retried-${Math.random().toString(36).slice(2)}`;
         add('bg-retried-in-slo', '<div class="bg"></div>');
@@ -510,7 +566,7 @@
           `запросов: ${requests}`,
         );
 
-        await Promise.all([...asyncImages, ...asyncBackgrounds, ...loads, ...dynamic]);
+        await Promise.all([...asyncImages, ...asyncBackgrounds, ...loads, ...dynamic, unlimited]);
 
         window.helperResults = cases;
       });

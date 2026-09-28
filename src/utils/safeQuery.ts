@@ -19,5 +19,9 @@ export function queryOne<E extends Element = Element>(selector: string): E | nul
 }
 
 export function queryAll<E extends Element = Element>(selector: string): E[] {
-  return safely(selector, [], () => Array.from(document.querySelectorAll<E>(selector)));
+  return queryAllIfValid<E>(selector) ?? [];
+}
+
+export function queryAllIfValid<E extends Element = Element>(selector: string): E[] | null {
+  return safely(selector, null, () => Array.from(document.querySelectorAll<E>(selector)));
 }

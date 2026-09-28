@@ -25,7 +25,7 @@ test('fails when an image cannot be decoded', async () => {
 test('fails after the timeout when an image never finishes loading', async () => {
   jest.useFakeTimers();
   const [slow] = renderImages('https://a.com/slow.png');
-  stubDecodedImage(slow, { decode: new Promise(() => {}) });
+  stubDecodedImage(slow, { complete: false, decode: new Promise(() => {}) });
 
   const result = asyncCheckImagesIsDisplayed('img', 500);
   await jest.advanceTimersByTimeAsync(500);

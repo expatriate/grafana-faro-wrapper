@@ -67,7 +67,7 @@ describe('FaroService', () => {
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Failed to send metric'),
-      expect.any(String),
+      expect.objectContaining({ message: expect.stringContaining('Faro not initialized') }),
     );
   });
 
@@ -110,7 +110,7 @@ describe('FaroService', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
-  test('the default pipeline cleans URLs of events and stack frames and parses metric labels', () => {
+  test('the default pipeline cleans URLs of events and stack frames', () => {
     const faro: any = new FaroService().init(config());
     const secretUrl = 'https://shop.test/orders/1234567?token=secret';
 
@@ -128,15 +128,9 @@ describe('FaroService', () => {
         stacktrace: { frames: [{ filename: secretUrl, function: '?', lineno: 1, colno: 1 }] },
       },
     });
-    const measurement = faro.beforeSend({
-      type: 'measurement',
-      meta: {},
-      payload: { type: 'custom', values: { m: 1 }, context: { 'measurement.labels': '{"a":1}' } },
-    });
 
     expect(event.payload.attributes).toEqual({ url: 'shop.test/orders/:id', kind: 'img' });
     expect(exception.payload.stacktrace.frames[0].filename).toBe('shop.test/orders/:id');
-    expect(measurement.payload.context['measurement.labels']).toEqual({ a: 1 });
   });
 
   test('beforeSend wrapper sanitizes the page URL and then calls the user beforeSend', () => {
@@ -281,6 +275,24 @@ describe('FaroService', () => {
       );
     });
 
+    test('turns extra value names into valid logfmt keys', () => {
+      const body = initTransforms().createMeasurementLogBody({
+        payload: { type: 'web-vitals', values: { lcp: 1200, 'first paint': 300, 'a=b': 1 } },
+      });
+
+      expect(body).toBe(
+        'faro_signal=measurement type=web-vitals name=lcp value=1200 value_first_paint=300 value_a_b=1',
+      );
+    });
+
+    test('escapes tabs and other control characters in an error message', () => {
+      const body = initTransforms().createErrorLogBody({
+        payload: { type: 'Error', value: 'bad\tvalue\u0000' },
+      });
+
+      expect(body).toBe('faro_signal=error type=Error message="bad\\tvalue\\u0000"');
+    });
+
     test('quotes a metric name containing spaces', () => {
       const body = initTransforms().createMeasurementLogBody({
         payload: { type: 'custom', values: { 'page load': 5 } },
@@ -387,7 +399,10 @@ describe('FaroService', () => {
 
     expect(faro).toBe(faroWebSdk.faro);
     expect(svc.isInitialized).toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(expect.any(String), 'instrumentation failed');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ message: 'instrumentation failed' }),
+    );
   });
 
   test('rethrows an initialization error when the registered Faro is not its own', () => {

@@ -10,7 +10,7 @@ const floors = Object.entries(pkg.peerDependencies).map(([name, range]) => [
   name,
   range.replace(/^\^/, ''),
 ]);
-const faroFloor = floors[0][1];
+const faroFloor = pkg.peerDependencies['@grafana/faro-web-sdk'].replace(/^\^/, '');
 const workdir = mkdtempSync(join(tmpdir(), 'faro-wrapper-floor-'));
 
 const abort = (message) => {
@@ -45,7 +45,7 @@ run('npm', [
   ...floors.map(([name, version]) => `${name}@${version}`),
   `@grafana/faro-core@${faroFloor}`,
 ]);
-for (const [name, version] of floors) {
+for (const [name, version] of [...floors, ['@grafana/faro-core', faroFloor]]) {
   const installed = JSON.parse(
     readFileSync(join(workdir, 'node_modules', name, 'package.json'), 'utf8'),
   ).version;

@@ -16,6 +16,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 test('a finished run sends exactly one histogram with the step results and extra labels', async () => {
@@ -162,7 +163,6 @@ test('an invalid startWhen selector warns and keeps waiting instead of throwing'
     expect.anything(),
   );
   tracker.dispose();
-  warn.mockRestore();
 });
 
 test('a startWhen predicate delays the clock and a throwing one means not yet', async () => {
@@ -238,7 +238,6 @@ test('labels cannot override the status or a step result, and the clash is repor
     source: 'landing',
   });
   expect(warn).toHaveBeenCalledWith(expect.stringContaining('status, render'));
-  warn.mockRestore();
 });
 
 test('a labels() function that throws sends the metric without extra labels', () => {
@@ -258,7 +257,6 @@ test('a labels() function that throws sends the metric without extra labels', ()
     render: true,
   });
   expect(warn).toHaveBeenCalledTimes(1);
-  warn.mockRestore();
 });
 
 test('an SLO without steps is not tracked and sends nothing', async () => {
@@ -274,5 +272,78 @@ test('an SLO without steps is not tracked and sends nothing', async () => {
   expect(tracker.state).toBe('disposed');
   expect(measurements()).toHaveLength(0);
   expect(warn).toHaveBeenCalledWith(expect.stringContaining('page_ready'));
-  warn.mockRestore();
+});
+
+test('a selector in startWhen notices an element that starts to match through a class', async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const { tracker, measurements } = trackThroughRealFaro({
+    name: 'app_ready',
+    failTime: 1000,
+    startWhen: '#app.ready',
+    steps: { render: () => true },
+  });
+
+  await jest.advanceTimersByTimeAsync(3000);
+  expect(tracker.state).toBe('waiting');
+  document.getElementById('app')!.classList.add('ready');
+  await jest.advanceTimersByTimeAsync(STEP_CHECK_INTERVAL_MS);
+
+  expect(tracker.state).toBe('done');
+  expect(measurements()[0]).toMatchObject({ values: { app_ready: 0 } });
+});
+
+test('a broken step fails the call even when startWhen waits for an element', () => {
+  expect(() =>
+    trackSlo(jest.fn(), {
+      name: 'page_ready',
+      failTime: 1000,
+      startWhen: '#not-yet',
+      steps: { render: null as unknown as () => boolean },
+    }),
+  ).toThrow(TypeError);
+});
+
+test('pauses while the tab is hidden unless told otherwise', async () => {
+  const { tracker } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 10_000,
+    steps: { render: () => false },
+  });
+
+  Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  const hiddenState = tracker.state;
+  Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+  document.dispatchEvent(new Event('visibilitychange'));
+
+  expect(hiddenState).toBe('paused');
+  expect(tracker.state).toBe('running');
+  tracker.dispose();
+});
+
+test('labels() returning nothing sends the metric with the step results', () => {
+  const { measurements } = trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    labels: () => undefined as unknown as Record<string, string>,
+    steps: { render: () => true },
+  });
+
+  expect(measurements()[0].context['measurement.labels']).toEqual({
+    status: 'success',
+    render: true,
+  });
+});
+
+test('a step named like an Object method is not reported as a label clash', () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  trackThroughRealFaro({
+    name: 'page_ready',
+    failTime: 1000,
+    labels: { source: 'landing' },
+    steps: { constructor: () => true, toString: () => true },
+  });
+
+  expect(warn).not.toHaveBeenCalled();
 });

@@ -3,36 +3,46 @@ interface Pausable {
   resume(): void;
 }
 
+type PauseReason = 'hidden' | 'blurred';
+
 export function pauseWhenHidden(run: Pausable): () => void {
+  const reasons = new Set<PauseReason>();
   let focusCheck: ReturnType<typeof setTimeout> | undefined;
-  const pause = () => run.pause();
-  const resumeIfVisible = () => {
-    if (!document.hidden) {
+
+  const setReason = (reason: PauseReason, applies: boolean) => {
+    if (applies) {
+      reasons.add(reason);
+    } else {
+      reasons.delete(reason);
+    }
+    if (reasons.size > 0) {
+      run.pause();
+    } else {
       run.resume();
     }
   };
-  const syncWithVisibility = () => (document.hidden ? pause() : resumeIfVisible());
+  const syncWithVisibility = () => setReason('hidden', document.hidden);
   const pauseIfFocusLeftPage = () => {
     clearTimeout(focusCheck);
     // Focus moving into a nested iframe blurs the window before hasFocus() reports it
     focusCheck = setTimeout(() => {
       if (!document.hasFocus()) {
-        pause();
+        setReason('blurred', true);
       }
     });
   };
 
   const windowListeners = [
-    ['pagehide', pause],
+    ['pagehide', () => setReason('hidden', true)],
+    ['pageshow', syncWithVisibility],
     ['blur', pauseIfFocusLeftPage],
-    ['pageshow', resumeIfVisible],
-    ['focus', resumeIfVisible],
+    ['focus', () => setReason('blurred', false)],
   ] as const;
 
   windowListeners.forEach(([event, listener]) => window.addEventListener(event, listener));
   document.addEventListener('visibilitychange', syncWithVisibility);
   if (document.hidden) {
-    pause();
+    setReason('hidden', true);
   }
 
   return () => {

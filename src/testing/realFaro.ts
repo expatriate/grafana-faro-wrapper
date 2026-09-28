@@ -7,6 +7,7 @@ import {
   TransportItemType,
 } from '@grafana/faro-core';
 import { SanitizerPipeline } from '../faro-service/SanitizerPipeline';
+import { parseMetricLabels } from '../measurement/parseMetricLabels';
 
 export function createRealFaro(): { faro: Faro; measurements: () => Record<string, any>[] } {
   const delivered: TransportItem[] = [];
@@ -39,6 +40,6 @@ export function createRealFaro(): { faro: Faro; measurements: () => Record<strin
     measurements: () =>
       delivered
         .filter((item) => item.type === TransportItemType.MEASUREMENT)
-        .map((item) => item.payload),
+        .map((item) => parseMetricLabels(item).payload),
   };
 }

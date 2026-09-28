@@ -1,15 +1,15 @@
-import { TransportItem } from '@grafana/faro-web-sdk';
-import { parseMetricLabels } from '../measurement/parseMetricLabels';
+import { BrowserConfig, TransportItem } from '@grafana/faro-web-sdk';
 import { LOG_PREFIX } from '../utils/logPrefix';
 import { sanitizeEventUrls, sanitizePageUrl, sanitizeStacktraceUrls } from '../utils/sanitizers';
 
 export type Sanitizer = (beacon: TransportItem) => TransportItem;
 
+type BeforeSend = BrowserConfig['beforeSend'];
+
 const DEFAULT_SANITIZERS: readonly Sanitizer[] = [
   sanitizePageUrl,
   sanitizeEventUrls,
   sanitizeStacktraceUrls,
-  parseMetricLabels,
 ];
 
 function copyBeacon(beacon: TransportItem): TransportItem {
@@ -24,30 +24,35 @@ function copyBeacon(beacon: TransportItem): TransportItem {
 export class SanitizerPipeline {
   private sanitizers = [...DEFAULT_SANITIZERS];
 
+  private beforeSend: BeforeSend;
+
   private failureReported = false;
 
   add(sanitizers: Sanitizer[]) {
     this.sanitizers = [...this.sanitizers, ...sanitizers];
   }
 
-  reset() {
-    this.sanitizers = [...DEFAULT_SANITIZERS];
-    this.failureReported = false;
+  endWith(beforeSend: BeforeSend) {
+    this.beforeSend = beforeSend;
   }
 
   run(beacon: TransportItem): TransportItem | null {
     try {
-      return this.sanitizers.reduce<TransportItem>((item, sanitize) => {
-        const sanitized = sanitize(item);
-        if (typeof sanitized !== 'object' || sanitized === null) {
+      const sanitized = this.sanitizers.reduce<TransportItem>((item, sanitize) => {
+        const result = sanitize(item);
+        if (typeof result !== 'object' || result === null) {
           throw new TypeError('sanitizer returned no beacon');
         }
-        return sanitized;
+        return result;
       }, copyBeacon(beacon));
+      return this.beforeSend ? this.beforeSend(sanitized) : sanitized;
     } catch (error) {
       if (!this.failureReported) {
         this.failureReported = true;
-        console.warn(`${LOG_PREFIX} A sanitizer failed, beacons it fails on are dropped:`, error);
+        console.warn(
+          `${LOG_PREFIX} A sanitizer or beforeSend failed, beacons it fails on are dropped:`,
+          error,
+        );
       }
       return null;
     }

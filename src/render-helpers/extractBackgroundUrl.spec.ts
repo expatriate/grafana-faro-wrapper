@@ -45,6 +45,20 @@ test('picks the image-set candidate the screen density would show', () => {
   Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
 });
 
+test('picks the first of equally dense candidates, as the browser shows on any screen', () => {
+  const imageSet =
+    'image-set(url("https://a.com/a.avif") 1dppx type("image/avif"), url("https://a.com/a.jpg") 1dppx type("image/jpeg"))';
+
+  for (const devicePixelRatio of [1, 2]) {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: devicePixelRatio,
+    });
+    expect(backgroundUrlOf(imageSet)).toBe('https://a.com/a.avif');
+  }
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+});
+
 test('returns null instead of throwing for something that is not an element', () => {
   expect(extractBackgroundUrl(null as unknown as Element)).toBeNull();
 });

@@ -18,7 +18,21 @@ export function stubDecodedImage(
   image.decode = () => decode;
 }
 
-export function stubImageLoading(outcomes: Record<string, ImageOutcome>) {
+const sameUrl = (a: string, b: string) =>
+  new URL(a, document.baseURI).href === new URL(b, document.baseURI).href;
+
+export function stubImageLoading(outcomes: Record<string, ImageOutcome | ImageOutcome[]>) {
+  const requests = new Map<string, number>();
+  const outcomeFor = (src: string): ImageOutcome => {
+    const key = Object.keys(outcomes).find((candidate) => sameUrl(candidate, src));
+    if (key === undefined) {
+      return 'error';
+    }
+    const attempt = requests.get(key) ?? 0;
+    requests.set(key, attempt + 1);
+    const planned = [outcomes[key]].flat();
+    return planned[Math.min(attempt, planned.length - 1)];
+  };
   return jest.spyOn(window, 'Image').mockImplementation(() => {
     const listeners: Record<string, Set<() => void>> = { load: new Set(), error: new Set() };
     let outcome: ImageOutcome = 'pending';
@@ -36,7 +50,7 @@ export function stubImageLoading(outcomes: Record<string, ImageOutcome>) {
     };
     Object.defineProperty(image, 'src', {
       set(src: string) {
-        outcome = outcomes[src] ?? 'error';
+        outcome = outcomeFor(src);
         if (outcome === 'pending') {
           return;
         }

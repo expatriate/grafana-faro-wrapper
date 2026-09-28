@@ -1,6 +1,7 @@
-import { getAmount } from './getAmount';
+import { countMatches, parseAmount } from './getAmount';
 
-export function checkGTEAmount(selector: string, amount: number): boolean {
-  const minimum = Number(amount);
-  return Number.isFinite(minimum) && getAmount(selector) >= minimum;
+export function checkGTEAmount(selector: string, amount: number | string): boolean {
+  const minimum = parseAmount(amount);
+  const count = countMatches(selector);
+  return minimum !== null && count !== null && count >= minimum;
 }

@@ -10,6 +10,10 @@ function sendThroughRealFaro(...metrics: Metric[]): Record<string, any>[] {
 
 const click: Metric = { name: 'user_action', value: 1, unit: 'EVENTS', type: 'counter' };
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 test('delivers value, unit, type, result and buckets as measurement context', () => {
   const [measurement] = sendThroughRealFaro({
     name: 'checkout',
@@ -84,5 +88,4 @@ test('warns once about a metric a plain-JS page gets wrong, and still sends it',
   expect(measurements).toHaveLength(2);
   expect(warn).toHaveBeenCalledTimes(1);
   expect(warn).toHaveBeenCalledWith(expect.stringContaining('typo_metric" has invalid unit, type'));
-  warn.mockRestore();
 });

@@ -10,6 +10,8 @@ function setPageFocused(focused: boolean) {
   jest.spyOn(document, 'hasFocus').mockReturnValue(focused);
 }
 
+const cleanups: (() => void)[] = [];
+
 function startRun(options: { startWhen?: () => boolean } = {}) {
   let rendered = false;
   const onFinish = jest.fn();
@@ -19,7 +21,11 @@ function startRun(options: { startWhen?: () => boolean } = {}) {
     steps: { render: () => rendered },
     ...options,
   });
-  pauseWhenHidden(run);
+  const unsubscribe = pauseWhenHidden(run);
+  cleanups.push(() => {
+    unsubscribe();
+    run.dispose();
+  });
   return {
     run,
     onFinish,
@@ -37,6 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanups.splice(0).forEach((cleanup) => cleanup());
   jest.useRealTimers();
   jest.restoreAllMocks();
   Object.defineProperty(document, 'hidden', { configurable: true, value: false });
@@ -99,6 +106,22 @@ test('switching windows pauses through blur and resumes on focus', async () => {
   setPageFocused(false);
   fire('blur');
   await jest.advanceTimersByTimeAsync(0);
+  expect(run.state).toBe('paused');
+
+  setPageFocused(true);
+  fire('focus');
+  expect(run.state).toBe('running');
+});
+
+test('a run paused by leaving the window stays paused when the tab shows again unfocused', async () => {
+  const { run } = startRun();
+
+  setPageFocused(false);
+  fire('blur');
+  await jest.advanceTimersByTimeAsync(0);
+  setTabHidden(true);
+  setTabHidden(false);
+  fire('pageshow');
   expect(run.state).toBe('paused');
 
   setPageFocused(true);

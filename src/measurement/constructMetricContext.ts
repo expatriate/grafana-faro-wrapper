@@ -8,12 +8,12 @@ export function constructMetricContext({
   type,
   labels,
   buckets,
-}: Omit<Metric, 'timestamp' | 'name' | 'value'>): Record<string, any> {
+}: Omit<Metric, 'timestamp' | 'name' | 'value'>): Record<string, string> {
   return {
     [MEASUREMENT_KEYS.UNIT]: unit,
     [MEASUREMENT_KEYS.TYPE]: type,
     ...(description && { [MEASUREMENT_KEYS.DESCRIPTION]: description }),
-    ...(labels && { [MEASUREMENT_KEYS.LABELS]: labels }),
+    ...(labels && { [MEASUREMENT_KEYS.LABELS]: JSON.stringify(labels) }),
     ...(result && { [MEASUREMENT_KEYS.RESULT]: result }),
     ...(buckets && { [MEASUREMENT_KEYS.BUCKETS]: buckets.join(',') }),
   };

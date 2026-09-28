@@ -29,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 test('passes a step once its check turns true and reports the moment it did', async () => {
@@ -177,7 +178,6 @@ test('log shows why a check fails, once per step', async () => {
   expect(info.mock.calls.filter(([, event]) => event === 'slo:step-error')).toEqual([
     [expect.any(String), 'slo:step-error', 'render', error],
   ]);
-  info.mockRestore();
 });
 
 test('excludes paused time from the duration and the deadlines', async () => {
@@ -239,4 +239,61 @@ test('ignores a late true from a check that missed its deadline', async () => {
   expect(onFinish).toHaveBeenCalledWith(
     expect.objectContaining({ steps: { render: true, data: false } }),
   );
+});
+
+test('an async check passing while paused finishes the run only after resume', async () => {
+  const data = deferred();
+  const { run, onFinish } = startRun({ steps: { render: () => true, data: () => data.promise } });
+
+  await afterTicks(1);
+  run.pause();
+  data.resolve(true);
+  await jest.advanceTimersByTimeAsync(5000);
+  expect(onFinish).not.toHaveBeenCalled();
+  expect(run.state).toBe('paused');
+
+  run.resume();
+
+  expect(onFinish).toHaveBeenCalledWith(
+    expect.objectContaining({ duration: STEP_CHECK_INTERVAL_MS, passed: true }),
+  );
+});
+
+test('fails a step whose async check passes after its deadline but before the next tick', async () => {
+  const data = deferred();
+  let rendered = false;
+  const { onFinish } = startRun({
+    steps: { render: () => rendered, data: { check: () => data.promise, failTime: 150 } },
+  });
+
+  await jest.advanceTimersByTimeAsync(170);
+  data.resolve(true);
+  rendered = true;
+  await afterTicks(1);
+
+  expect(onFinish).toHaveBeenCalledWith(
+    expect.objectContaining({ steps: { render: true, data: false } }),
+  );
+});
+
+test('log names the SLO and shows once why the start condition throws', async () => {
+  const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+  const error = new Error('app is not mounted');
+  const run = new SloRun<Step>({
+    name: 'page_ready',
+    log: true,
+    failTime: 10_000,
+    onFinish: jest.fn(),
+    startWhen: () => {
+      throw error;
+    },
+    steps: { render: () => true, data: () => true },
+  });
+
+  await afterTicks(3);
+
+  expect(info.mock.calls.filter(([, event]) => event === 'slo:start-error')).toEqual([
+    [expect.stringContaining('"page_ready"'), 'slo:start-error', error],
+  ]);
+  run.dispose();
 });

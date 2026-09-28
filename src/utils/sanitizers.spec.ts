@@ -10,6 +10,14 @@ describe('sanitizers', () => {
       ).toBe('a.com/order_:id/img/:id_thumb.png');
     });
 
+    test('treats a percent-encoded character as a separator around identifiers', () => {
+      expect(
+        sanitizeUrl(
+          'https://a.com/orders/%7B550e8400-e29b-41d4-a716-446655440000%7D/items%2F1234567',
+        ),
+      ).toBe('a.com/orders/%7b:id%7d/items%2f:id');
+    });
+
     test('keeps identifiers glued to letters, as they are not standalone ids', () => {
       expect(sanitizeUrl('https://a.com/v2/order123456789')).toBe('a.com/v2/order123456789');
     });
@@ -139,6 +147,19 @@ describe('sanitizers', () => {
       expect((sanitizeEventUrls(beacon).payload as any).attributes).toEqual({
         fromUrl: 'a.com/',
         toUrl: 'a.com/magic',
+      });
+    });
+
+    test('leaves text that only starts with a URL as it is, as README promises', () => {
+      const beacon: any = {
+        type: 'event',
+        payload: {
+          name: 'ui.message',
+          attributes: { text: 'https://a.com/help opened from the banner' },
+        },
+      };
+      expect((sanitizeEventUrls(beacon).payload as any).attributes).toEqual({
+        text: 'https://a.com/help opened from the banner',
       });
     });
 

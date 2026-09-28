@@ -8,11 +8,11 @@ import {
   TransportItem,
 } from '@grafana/faro-web-sdk';
 import { OtlpHttpTransport } from '@grafana/faro-transport-otlp-http';
-import { OTLP_LOG_BODIES } from '../measurement/otlpLogBodies';
 import { sendMeasurement } from '../measurement/sendMeasurement';
 import { Metric } from '../measurement/types';
 import { inactiveTracker, SloConfig, SloTracker, trackSlo } from '../slo/trackSlo';
 import { LOG_PREFIX } from '../utils/logPrefix';
+import { createOtlpTransport } from './createOtlpTransport';
 import { Sanitizer, SanitizerPipeline } from './SanitizerPipeline';
 
 export interface FaroConfig {
@@ -39,6 +39,15 @@ type PausedState = StartedFaro & { kind: 'paused' };
 
 type ServiceState = { kind: 'idle' } | (StartedFaro & { kind: 'active' }) | PausedState;
 
+interface RetiredPipeline {
+  pipeline: SanitizerPipeline;
+  lastCapturedAt: number;
+}
+
+function capturedAt(beacon: TransportItem): number {
+  return Date.parse((beacon.payload as { timestamp?: string } | undefined)?.timestamp ?? '');
+}
+
 function warnAboutIgnoredChanges(initial: FaroIdentity, identity: FaroIdentity) {
   const changed = (Object.keys(identity) as (keyof FaroIdentity)[]).filter(
     (option) => !deepEqual(identity[option], initial[option]),
@@ -58,21 +67,17 @@ function isFaroLoaded(): boolean {
   }
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
-}
-
 export class FaroService {
   private state: ServiceState = { kind: 'idle' };
-  private sanitizers = new SanitizerPipeline();
-  private userBeforeSend: BrowserConfig['beforeSend'];
+  private pipeline = new SanitizerPipeline();
+  private retired: RetiredPipeline | undefined;
 
   init(config: FaroServiceConfig): Faro {
     if (this.state.kind === 'active') {
       console.warn(`${LOG_PREFIX} FaroService already initialized`);
       return this.state.faro;
     }
-    this.userBeforeSend = config.beforeSend;
+    this.pipeline.endWith(config.beforeSend);
     return this.state.kind === 'paused' ? this.resume(this.state, config) : this.create(config);
   }
 
@@ -81,14 +86,14 @@ export class FaroService {
     if (!sanitizers.every((item) => typeof item === 'function')) {
       throw new TypeError(`${LOG_PREFIX} addSanitizer expects a function or an array of functions`);
     }
-    this.sanitizers.add(sanitizers);
+    this.pipeline.add(sanitizers);
   }
 
   sendMetric(metric: Metric) {
     try {
       sendMeasurement(this.getInstance(), metric);
     } catch (error) {
-      console.warn(`${LOG_PREFIX} Failed to send metric:`, errorMessage(error));
+      console.warn(`${LOG_PREFIX} Failed to send metric:`, error);
     }
   }
 
@@ -96,7 +101,7 @@ export class FaroService {
     try {
       return trackSlo((metric) => this.sendMetric(metric), config);
     } catch (error) {
-      console.warn(`${LOG_PREFIX} Failed to track SLO:`, errorMessage(error));
+      console.warn(`${LOG_PREFIX} Failed to track SLO:`, error);
       return inactiveTracker;
     }
   }
@@ -118,7 +123,8 @@ export class FaroService {
     }
     this.state.faro.pause();
     this.state = { ...this.state, kind: 'paused' };
-    this.sanitizers.reset();
+    this.retired = { pipeline: this.pipeline, lastCapturedAt: Date.now() };
+    this.pipeline = new SanitizerPipeline();
   }
 
   private resume(
@@ -149,11 +155,7 @@ export class FaroService {
           'include their IIFE bundles before dist/index.umd.js or use dist/index.umd.full.js',
       );
     }
-    const otlpTransport = new OtlpHttpTransport({
-      apiKey: faroKey,
-      logsURL: faroUrl,
-      otlpTransform: OTLP_LOG_BODIES,
-    });
+    const otlpTransport = createOtlpTransport(faroUrl, faroKey);
     const faro = this.initializeOwnFaro(otlpTransport, {
       transports: [otlpTransport, ...transports],
       instrumentations: [...(routerAdapter ? [routerAdapter] : []), ...instrumentations],
@@ -173,7 +175,7 @@ export class FaroService {
       if (!registeredFaro.transports?.transports.includes(otlpTransport)) {
         throw error;
       }
-      console.warn(`${LOG_PREFIX} Faro initialized with an error:`, errorMessage(error));
+      console.warn(`${LOG_PREFIX} Faro initialized with an error:`, error);
       return registeredFaro;
     }
     if (!faro) {
@@ -186,10 +188,13 @@ export class FaroService {
   }
 
   private sanitize(beacon: TransportItem): TransportItem | null {
-    const sanitized = this.sanitizers.run(beacon);
-    if (!sanitized) {
-      return null;
-    }
-    return this.userBeforeSend ? this.userBeforeSend(sanitized) : sanitized;
+    return this.pipelineCapturing(beacon).run(beacon);
+  }
+
+  private pipelineCapturing(beacon: TransportItem): SanitizerPipeline {
+    const { retired } = this;
+    return retired && capturedAt(beacon) <= retired.lastCapturedAt
+      ? retired.pipeline
+      : this.pipeline;
   }
 }

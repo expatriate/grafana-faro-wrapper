@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="windows-1251" />
+    <script>
+      window.pageErrors = [];
+      addEventListener('error', (event) => pageErrors.push(String(event.message)));
+      addEventListener('unhandledrejection', (event) => pageErrors.push(String(event.reason)));
+
+      const remove = (owner, names) => names.forEach((name) => delete owner[name]);
+      remove(Array.prototype, [
+        'at',
+        'findLast',
+        'findLastIndex',
+        'toSorted',
+        'toReversed',
+        'with',
+      ]);
+      remove(String.prototype, ['at', 'replaceAll']);
+      remove(Object, ['hasOwn', 'groupBy']);
+      remove(Promise, ['allSettled', 'any']);
+      remove(window, ['structuredClone', 'WeakRef', 'FinalizationRegistry', 'AggregateError']);
+    </script>
+    <script src="/bundle.js"></script>
+  </head>
+  <body>
+    <div id="app">Ready</div>
+    <button id="pay">Pay</button>
+    <script>
+      const sent = [];
+      window.fetch = (url, init) => {
+        sent.push(String(init && init.body));
+        return Promise.resolve(new Response('', { status: 200 }));
+      };
+
+      const run = async () => {
+        const H = window.GrafanaFaroWrapper;
+        const service = new H.FaroService();
+        service.init({
+          faroUrl: `${location.origin}/collect`,
+          faroKey: 'key',
+          app: { name: 'legacy-browser' },
+          batching: { enabled: false },
+          instrumentations: H.getWebInstrumentations({ captureConsole: false }),
+        });
+        service.trackSlo({
+          name: 'legacy_ready',
+          failTime: 3000,
+          pauseWhenHidden: false,
+          steps: {
+            text: () => H.checkRenderInnerValue('#app'),
+            button: () => H.checkEnabledButtonState('#pay'),
+          },
+        });
+
+        await new Promise((done) => setTimeout(done, 300));
+        const shift = document.createElement('div');
+        shift.style.height = '300px';
+        document.body.prepend(shift);
+        document.getElementById('pay').click();
+        await new Promise((done) => setTimeout(done, 300));
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+        dispatchEvent(new Event('pagehide'));
+        await new Promise((done) => setTimeout(done, 500));
+
+        window.legacyResult = {
+          errors: pageErrors,
+          sloSent: sent.some((body) => body.includes('name=legacy_ready')),
+        };
+      };
+
+      if (window.GrafanaFaroWrapper) {
+        addEventListener('load', run);
+      } else {
+        window.legacyResult = { errors: pageErrors, sloSent: false };
+      }
+    </script>
+  </body>
+</html>

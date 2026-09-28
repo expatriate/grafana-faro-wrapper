@@ -5,7 +5,7 @@ import {
   TransportItemType,
 } from '@grafana/faro-web-sdk';
 
-const ID_START = '(^|[^0-9a-z])';
+const ID_START = '(^|%[0-9a-f]{2}|[^0-9a-z])';
 const ID_END = '(?=$|[^0-9a-z])';
 const idPattern = (id: string) => new RegExp(`${ID_START}${id}${ID_END}`, 'g');
 
@@ -14,7 +14,7 @@ const ID_PATTERNS = [
   idPattern('[0-9a-f]{12,}'),
   idPattern('\\d{6,}'),
 ];
-const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
+const WHOLE_HTTP_URL = /^https?:\/\/\S+$/i;
 const QUERY_OR_HASH = /[?#]/;
 
 export function sanitizePath(pathname: string): string {
@@ -33,8 +33,7 @@ export function sanitizeUrl(input: string): string {
   }
 }
 
-const sanitizeIfUrl = (value: string) =>
-  ABSOLUTE_HTTP_URL.test(value) ? sanitizeUrl(value) : value;
+const sanitizeIfUrl = (value: string) => (WHOLE_HTTP_URL.test(value) ? sanitizeUrl(value) : value);
 
 export function sanitizePageUrl(beacon: TransportItem): TransportItem {
   const url = beacon.meta.page?.url;

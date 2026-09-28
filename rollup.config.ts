@@ -31,13 +31,15 @@ const downlevelToEs2019 = (): Plugin => ({
 
 const umd = { format: 'umd', name: UMD_NAME, sourcemap: true } as const;
 
+const minify = () => terser({ format: { ascii_only: true } });
+
 export default [
   {
     input: 'src/index.ts',
     output: [
       { file: OUTPUTS.esm, format: 'esm', sourcemap: true },
       { file: OUTPUTS.cjs, format: 'cjs', sourcemap: true },
-      { ...umd, file: OUTPUTS.umd, globals: FARO_GLOBALS, plugins: [terser()] },
+      { ...umd, file: OUTPUTS.umd, globals: FARO_GLOBALS, plugins: [minify()] },
     ],
     external,
     plugins: [compileTs()],
@@ -48,7 +50,7 @@ export default [
       ...umd,
       file: OUTPUTS.umdFull,
       sourcemapExcludeSources: true,
-      plugins: [downlevelToEs2019(), terser()],
+      plugins: [downlevelToEs2019(), minify()],
     },
     plugins: [resolve({ browser: true }), commonjs(), compileTs()],
   },

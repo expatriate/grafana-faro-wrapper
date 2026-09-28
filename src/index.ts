@@ -1,4 +1,5 @@
-export { getWebInstrumentations, TransportItemType } from '@grafana/faro-web-sdk';
+export { TransportItemType } from '@grafana/faro-web-sdk';
+export { getWebInstrumentations } from './faro-service/getWebInstrumentations';
 export { FaroService } from './faro-service/FaroService';
 export type { FaroConfig, FaroServiceConfig, Sanitizer } from './faro-service/FaroService';
 export { MEASUREMENT_KEYS } from './measurement/keys';

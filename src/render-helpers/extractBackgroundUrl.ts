@@ -37,8 +37,10 @@ function urlForScreenDensity(imageSet: string): string | null {
       return { url, density: Number(density ?? 1) };
     })
     .sort((a, b) => a.density - b.density);
+  const densest = candidates[candidates.length - 1];
   const chosen =
-    candidates.find(({ density }) => density >= window.devicePixelRatio) ?? candidates.pop();
+    candidates.find(({ density }) => density >= window.devicePixelRatio) ??
+    candidates.find(({ density }) => density === densest?.density);
   return chosen?.url ?? null;
 }
 

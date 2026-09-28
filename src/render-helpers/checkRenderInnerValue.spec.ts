@@ -1,4 +1,7 @@
+import { forgetLayout, renderAs } from '../testing/layoutStubs';
 import { checkRenderInnerValue } from './checkRenderInnerValue';
+
+afterEach(forgetLayout);
 
 test('passes only when every element is present and has text', () => {
   document.body.innerHTML = '<div class="tariff">Pro</div><div class="price"></div>';
@@ -28,11 +31,6 @@ test('does not count styles, scripts or invisible characters as text', () => {
   expect(checkRenderInnerValue('.zero-width')).toBe(false);
   expect(checkRenderInnerValue('.text-with-style')).toBe(true);
 });
-
-function renderAs(element: Element, { text, rendered }: { text: string; rendered: boolean }) {
-  Object.defineProperty(element, 'innerText', { value: text });
-  element.getClientRects = () => (rendered ? [{}] : []) as unknown as DOMRectList;
-}
 
 test('relies on the text the browser renders, so hidden text does not count', () => {
   document.body.innerHTML = '<div class="price"><span style="display:none">9$</span></div>';

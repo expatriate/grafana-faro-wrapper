@@ -1,5 +1,9 @@
 import { checkRender } from './checkRender';
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 test('passes only when every selector is in the DOM', () => {
   document.body.innerHTML = '<div class="tariff"></div>';
 
@@ -16,7 +20,6 @@ test('an invalid selector fails the check with one warning instead of throwing',
   expect(checkRender('[data-slo=code input]')).toBe(false);
 
   expect(warn).toHaveBeenCalledTimes(1);
-  warn.mockRestore();
 });
 
 test('an empty list of selectors does not pass', () => {

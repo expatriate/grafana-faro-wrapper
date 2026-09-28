@@ -40,23 +40,17 @@ function settled(image: HTMLImageElement, timeoutMs: number): Promise<void> {
   if (image.complete) {
     return Promise.resolve();
   }
-  return new Promise((resolve, reject) => {
-    const stopListening = () => {
-      clearTimeout(timer);
+  let stopListening = () => {};
+  const loadedOrFailed = new Promise<void>((resolve) => {
+    const onSettled = () => resolve();
+    image.addEventListener('load', onSettled);
+    image.addEventListener('error', onSettled);
+    stopListening = () => {
       image.removeEventListener('load', onSettled);
       image.removeEventListener('error', onSettled);
     };
-    const onSettled = () => {
-      stopListening();
-      resolve();
-    };
-    const timer = setTimeout(() => {
-      stopListening();
-      reject(new Error(`timed out after ${timeoutMs} ms`));
-    }, timeoutMs);
-    image.addEventListener('load', onSettled);
-    image.addEventListener('error', onSettled);
   });
+  return withTimeout(loadedOrFailed, timeoutMs).finally(stopListening);
 }
 
 export async function isImageLoaded(image: HTMLImageElement, timeoutMs: number): Promise<boolean> {

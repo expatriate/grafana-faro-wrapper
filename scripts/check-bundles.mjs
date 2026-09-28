@@ -104,6 +104,16 @@ function sameExports(label, keys, expected) {
   }
 }
 
+for (const bundle of [OUTPUTS.esm, OUTPUTS.cjs, OUTPUTS.umd, OUTPUTS.umdFull]) {
+  const offset = read(bundle).search(/[^\x00-\x7F]/);
+  if (offset !== -1) {
+    fail(
+      `${bundle} has a non-ASCII character at offset ${offset}: pages served in another charset cannot parse it`,
+    );
+  }
+}
+console.log('✓ Bundles are pure ASCII and parse on pages in any charset.');
+
 const esmPage = createPage();
 for (const name of [
   'window',
